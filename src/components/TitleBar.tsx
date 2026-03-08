@@ -16,6 +16,7 @@ export default function TitleBar({ onOpenSettings }: TitleBarProps) {
           S+
         </div>
         <span className="text-xs font-medium text-text-secondary">{t('app.name')}</span>
+        <span className="text-[10px] text-text-muted/50">v0.1.1</span>
       </div>
       <div className="titlebar-no-drag flex items-center">
         <button

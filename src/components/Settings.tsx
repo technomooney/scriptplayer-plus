@@ -403,7 +403,7 @@ function AboutSection() {
           <div className="text-sm font-semibold text-text-primary">
             {t('app.name')}
           </div>
-          <div className="text-xs text-text-muted">{t('settings.version')} 1.0.0</div>
+          <div className="text-xs text-text-muted">{t('settings.version')} 0.1.1</div>
         </div>
       </div>
 
