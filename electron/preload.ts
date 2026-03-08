@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // File system
   readDir: (path: string) => ipcRenderer.invoke('fs:readDir', path),
-  readFunscript: (videoPath: string) => ipcRenderer.invoke('fs:readFunscript', videoPath),
+  readFunscript: (videoPath: string, scriptFolder?: string) => ipcRenderer.invoke('fs:readFunscript', videoPath, scriptFolder),
   saveFunscript: (videoPath: string, data: string) => ipcRenderer.invoke('fs:saveFunscript', videoPath, data),
   getVideoUrl: (filePath: string) => ipcRenderer.invoke('fs:getVideoUrl', filePath),
 
@@ -39,6 +39,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   eroscriptsLogin: () => ipcRenderer.invoke('eroscripts:login'),
   eroscriptsLogout: () => ipcRenderer.invoke('eroscripts:logout'),
   eroscriptsFetch: (url: string) => ipcRenderer.invoke('eroscripts:fetch', url),
-  eroscriptsDownload: (url: string) => ipcRenderer.invoke('eroscripts:download', url),
+  eroscriptsDownload: (url: string, scriptFolder?: string, saveName?: string) => ipcRenderer.invoke('eroscripts:download', url, scriptFolder, saveName),
   eroscriptsGetCookies: () => ipcRenderer.invoke('eroscripts:getCookies'),
 })

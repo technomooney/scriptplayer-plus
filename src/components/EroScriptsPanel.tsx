@@ -25,9 +25,10 @@ interface EroScriptSearchResult {
 
 interface EroScriptsPanelProps {
   currentVideoName: string | null
+  scriptFolder?: string
 }
 
-export default function EroScriptsPanel({ currentVideoName }: EroScriptsPanelProps) {
+export default function EroScriptsPanel({ currentVideoName, scriptFolder }: EroScriptsPanelProps) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<EroScriptSearchResult[]>([])
@@ -172,7 +173,7 @@ export default function EroScriptsPanel({ currentVideoName }: EroScriptsPanelPro
       return
     }
     setDownloading(url)
-    const result = await window.electronAPI.eroscriptsDownload(url)
+    const result = await window.electronAPI.eroscriptsDownload(url, scriptFolder, filename)
     if (result.ok) {
       setDownloaded(prev => new Set(prev).add(url))
     }

@@ -49,6 +49,7 @@ interface SidebarProps {
   handyConnected: boolean
   onHandyConnect: (key: string) => void
   onHandyDisconnect: () => void
+  scriptFolder?: string
 }
 
 interface FolderGroup {
@@ -81,6 +82,7 @@ export default function Sidebar({
   handyConnected,
   onHandyConnect,
   onHandyDisconnect,
+  scriptFolder,
 }: SidebarProps) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<'files' | 'search' | 'device'>('files')
@@ -244,6 +246,7 @@ export default function Sidebar({
         {tab === 'search' && (
           <EroScriptsPanel
             currentVideoName={currentFile ? getFileName(currentFile) : null}
+            scriptFolder={scriptFolder}
           />
         )}
 

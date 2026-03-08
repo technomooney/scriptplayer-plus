@@ -53,7 +53,7 @@ declare global {
       openVideo: () => Promise<string | null>
       openFolder: () => Promise<string | null>
       readDir: (path: string) => Promise<VideoFile[]>
-      readFunscript: (videoPath: string) => Promise<Funscript | null>
+      readFunscript: (videoPath: string, scriptFolder?: string) => Promise<Funscript | null>
       saveFunscript: (videoPath: string, data: string) => Promise<boolean>
       getVideoUrl: (filePath: string) => Promise<string>
 
@@ -62,7 +62,7 @@ declare global {
       eroscriptsLogin: () => Promise<{ success: boolean; username: string; cookies: string }>
       eroscriptsLogout: () => Promise<boolean>
       eroscriptsFetch: (url: string) => Promise<{ ok: boolean; data: any; error?: string }>
-      eroscriptsDownload: (url: string) => Promise<{ ok: boolean; path?: string; content?: string; error?: string }>
+      eroscriptsDownload: (url: string, scriptFolder?: string, saveName?: string) => Promise<{ ok: boolean; path?: string; content?: string; error?: string }>
       eroscriptsGetCookies: () => Promise<string>
     }
   }

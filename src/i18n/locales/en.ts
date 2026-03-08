@@ -73,6 +73,8 @@ const en: Record<string, string> = {
   'settings.timeline': 'Timeline',
   'settings.device': 'Device',
   'settings.eroscripts': 'EroScripts',
+  'settings.scriptFolder': 'Script Storage Folder',
+  'settings.scriptFolderDesc': 'Downloaded scripts are saved here and used as fallback when no local script is found',
   'settings.noFolderSelected': 'No folder selected',
   'settings.browse': 'Browse',
   'settings.autoLoadScriptDesc': 'Automatically load matching .funscript files when opening a video',

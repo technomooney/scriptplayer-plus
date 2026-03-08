@@ -58,7 +58,7 @@ export default function App() {
     const url = await window.electronAPI.getVideoUrl(file.path)
     setVideoUrl(url)
 
-    const script = await window.electronAPI.readFunscript(file.path)
+    const script = await window.electronAPI.readFunscript(file.path, settings.scriptFolder)
     const parsed = script ? parseFunscript(script) : null
     setFunscript(parsed)
     setScriptUploadUrl(null)
@@ -66,7 +66,7 @@ export default function App() {
     if (parsed && handyService.isConnected) {
       uploadToHandy(parsed.actions)
     }
-  }, [])
+  }, [settings.scriptFolder])
 
   const uploadToHandy = async (scriptActions: FunscriptAction[]) => {
     const url = await handyService.uploadAndSetup(scriptActions)
@@ -156,7 +156,7 @@ export default function App() {
           const url = await window.electronAPI.getVideoUrl(path)
           setVideoUrl(url)
 
-          const script = await window.electronAPI.readFunscript(path)
+          const script = await window.electronAPI.readFunscript(path, settings.scriptFolder)
           const parsed = script ? parseFunscript(script) : null
           setFunscript(parsed)
           setScriptUploadUrl(null)
@@ -199,6 +199,7 @@ export default function App() {
           handyConnected={handyConnected}
           onHandyConnect={handleHandyConnect}
           onHandyDisconnect={handleHandyDisconnect}
+          scriptFolder={settings.scriptFolder}
         />
         <VideoPlayer
           videoUrl={videoUrl}

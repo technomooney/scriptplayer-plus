@@ -61,6 +61,7 @@ const ja: Record<string, string> = {
   'settings.about': '\u60C5\u5831',
   'settings.version': '\u30D0\u30FC\u30B8\u30E7\u30F3',
   'settings.videoFolder': '\u30C7\u30D5\u30A9\u30EB\u30C8\u306E\u52D5\u753B\u30D5\u30A9\u30EB\u30C0\u30FC',
+  'settings.scriptFolder': '\u30B9\u30AF\u30EA\u30D7\u30C8\u4FDD\u5B58\u30D5\u30A9\u30EB\u30C0\u30FC',
   'settings.chooseFolder': '\u30D5\u30A9\u30EB\u30C0\u30FC\u3092\u9078\u629E',
   'settings.keyboardShortcuts': '\u30AD\u30FC\u30DC\u30FC\u30C9\u30B7\u30E7\u30FC\u30C8\u30AB\u30C3\u30C8',
   'settings.playPause': '\u518D\u751F / \u4E00\u6642\u505C\u6B62',

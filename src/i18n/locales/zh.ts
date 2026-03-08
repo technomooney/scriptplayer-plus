@@ -61,6 +61,7 @@ const zh: Record<string, string> = {
   'settings.about': '\u5173\u4E8E',
   'settings.version': '\u7248\u672C',
   'settings.videoFolder': '\u9ED8\u8BA4\u89C6\u9891\u6587\u4EF6\u5939',
+  'settings.scriptFolder': '\u811A\u672C\u5B58\u50A8\u6587\u4EF6\u5939',
   'settings.chooseFolder': '\u9009\u62E9\u6587\u4EF6\u5939',
   'settings.keyboardShortcuts': '\u952E\u76D8\u5FEB\u6377\u952E',
   'settings.playPause': '\u64AD\u653E / \u6682\u505C',

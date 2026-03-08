@@ -2,6 +2,7 @@ export interface AppSettings {
   // General
   language: string // 'en' | 'ko' | 'ja' | 'zh'
   defaultVideoFolder: string
+  scriptFolder: string
 
   // Appearance
   theme: 'dark' // only dark for now
@@ -20,6 +21,7 @@ export interface AppSettings {
 export const defaultSettings: AppSettings = {
   language: 'en',
   defaultVideoFolder: '',
+  scriptFolder: '',
   theme: 'dark',
   timelineHeight: 64,
   timelineWindow: 10,

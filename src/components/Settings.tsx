@@ -106,9 +106,14 @@ function GeneralSection({
     try {
       const folderPath = await (window as any).electronAPI?.openFolder?.()
       if (folderPath) update('defaultVideoFolder', folderPath)
-    } catch {
-      // not available
-    }
+    } catch {}
+  }
+
+  const handleBrowseScriptFolder = async () => {
+    try {
+      const folderPath = await (window as any).electronAPI?.openFolder?.()
+      if (folderPath) update('scriptFolder', folderPath)
+    } catch {}
   }
 
   return (
@@ -136,6 +141,21 @@ function GeneralSection({
       >
         <button
           onClick={handleBrowseFolder}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs transition-colors"
+        >
+          <FolderOpen size={12} />
+          {t('settings.browse')}
+        </button>
+      </FieldRow>
+
+      <Divider />
+
+      <FieldRow
+        label={t('settings.scriptFolder')}
+        description={settings.scriptFolder || t('settings.noFolderSelected')}
+      >
+        <button
+          onClick={handleBrowseScriptFolder}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 text-accent rounded text-xs transition-colors"
         >
           <FolderOpen size={12} />

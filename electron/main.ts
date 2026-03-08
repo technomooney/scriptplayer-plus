@@ -124,15 +124,28 @@ ipcMain.handle('fs:readDir', async (_event, dirPath: string) => {
   }
 })
 
-ipcMain.handle('fs:readFunscript', async (_event, videoPath: string) => {
+ipcMain.handle('fs:readFunscript', async (_event, videoPath: string, scriptFolder?: string) => {
   const ext = path.extname(videoPath)
+  const baseName = path.basename(videoPath, ext)
+
+  // 1. Check next to video file
   const scriptPath = videoPath.replace(ext, '.funscript')
   try {
     const content = fs.readFileSync(scriptPath, 'utf-8')
     return JSON.parse(content)
-  } catch {
-    return null
+  } catch {}
+
+  // 2. Fallback: check script storage folder
+  if (scriptFolder) {
+    try {
+      const fallbackPath = path.join(scriptFolder, baseName + '.funscript')
+      const content = fs.readFileSync(fallbackPath, 'utf-8')
+      console.log('[Script] Found in script folder:', fallbackPath)
+      return JSON.parse(content)
+    } catch {}
   }
+
+  return null
 })
 
 ipcMain.handle('fs:saveFunscript', async (_event, videoPath: string, data: string) => {
@@ -641,13 +654,15 @@ ipcMain.handle('eroscripts:fetch', async (_event, url: string) => {
   }
 })
 
-ipcMain.handle('eroscripts:download', async (_event, url: string) => {
+ipcMain.handle('eroscripts:download', async (_event, url: string, scriptFolder?: string, saveName?: string) => {
   try {
-    const tempDir = path.join(app.getPath('temp'), 'scriptplayerplus-ero')
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true })
+    // Use script folder if set, otherwise temp
+    const saveDir = scriptFolder || path.join(app.getPath('temp'), 'scriptplayerplus-ero')
+    if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true })
 
-    const fileName = decodeURIComponent(url.split('/').pop() || 'script.funscript')
-    const localPath = path.join(tempDir, fileName)
+    const fileName = saveName || decodeURIComponent(url.split('/').pop() || 'script.funscript')
+    const localPath = path.join(saveDir, fileName)
+    console.log('[EroScripts] Downloading to:', localPath)
 
     await new Promise<void>((resolve, reject) => {
       const parsed = new URL(url)

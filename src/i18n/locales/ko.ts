@@ -61,6 +61,7 @@ const ko: Record<string, string> = {
   'settings.about': '\uC815\uBCF4',
   'settings.version': '\uBC84\uC804',
   'settings.videoFolder': '\uAE30\uBCF8 \uBE44\uB514\uC624 \uD3F4\uB354',
+  'settings.scriptFolder': '스크립트 저장 폴더',
   'settings.chooseFolder': '\uD3F4\uB354 \uC120\uD0DD',
   'settings.keyboardShortcuts': '\uD0A4\uBCF4\uB4DC \uB2E8\uCD95\uD0A4',
   'settings.playPause': '\uC7AC\uC0DD / \uC77C\uC2DC\uC815\uC9C0',
