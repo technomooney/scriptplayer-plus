@@ -1,0 +1,51 @@
+export interface AppSettings {
+  // General
+  language: string // 'en' | 'ko' | 'ja' | 'zh'
+  defaultVideoFolder: string
+
+  // Appearance
+  theme: 'dark' // only dark for now
+
+  // Timeline
+  timelineHeight: number // px, 40-120
+  timelineWindow: number // seconds, 5-30
+  speedColors: boolean
+
+  // Device
+  strokeRangeMin: number // 0-100
+  strokeRangeMax: number // 0-100
+  timeOffset: number // ms, -500 to 500
+}
+
+export const defaultSettings: AppSettings = {
+  language: 'en',
+  defaultVideoFolder: '',
+  theme: 'dark',
+  timelineHeight: 64,
+  timelineWindow: 10,
+  speedColors: true,
+  strokeRangeMin: 0,
+  strokeRangeMax: 100,
+  timeOffset: 0,
+}
+
+const STORAGE_KEY = 'handycontrol-settings'
+
+export function loadSettings(): AppSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return { ...defaultSettings }
+    const parsed = JSON.parse(raw)
+    return { ...defaultSettings, ...parsed }
+  } catch {
+    return { ...defaultSettings }
+  }
+}
+
+export function saveSettings(settings: AppSettings): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    // Storage full or unavailable — silently ignore
+  }
+}

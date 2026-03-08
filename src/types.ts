@@ -1,0 +1,69 @@
+export interface FunscriptAction {
+  at: number  // milliseconds
+  pos: number // 0-100
+}
+
+export interface Funscript {
+  version: string
+  inverted: boolean
+  range: number
+  actions: FunscriptAction[]
+  metadata?: {
+    creator?: string
+    description?: string
+    duration?: number
+    license?: string
+    notes?: string
+    performers?: string[]
+    script_url?: string
+    tags?: string[]
+    title?: string
+    type?: string
+    video_url?: string
+  }
+}
+
+export interface VideoFile {
+  name: string
+  path: string
+  hasScript: boolean
+  relativePath?: string
+}
+
+export interface HandyStatus {
+  connected: boolean
+  firmware: string
+  mode: number
+}
+
+export interface EroScriptResult {
+  title: string
+  url: string
+  creator: string
+  date: string
+}
+
+declare global {
+  interface Window {
+    electronAPI: {
+      platform: string
+      minimize: () => void
+      maximize: () => void
+      close: () => void
+      openVideo: () => Promise<string | null>
+      openFolder: () => Promise<string | null>
+      readDir: (path: string) => Promise<VideoFile[]>
+      readFunscript: (videoPath: string) => Promise<Funscript | null>
+      saveFunscript: (videoPath: string, data: string) => Promise<boolean>
+      getVideoUrl: (filePath: string) => Promise<string>
+
+      // EroScripts
+      eroscriptsCheckSession: () => Promise<{ loggedIn: boolean; username: string }>
+      eroscriptsLogin: () => Promise<{ success: boolean; username: string; cookies: string }>
+      eroscriptsLogout: () => Promise<boolean>
+      eroscriptsFetch: (url: string) => Promise<{ ok: boolean; data: any; error?: string }>
+      eroscriptsDownload: (url: string) => Promise<{ ok: boolean; path?: string; content?: string; error?: string }>
+      eroscriptsGetCookies: () => Promise<string>
+    }
+  }
+}
