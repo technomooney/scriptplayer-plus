@@ -16,11 +16,11 @@
 
 ## 스크린샷
 
-| 메인 화면 | 재생 (타임라인 + 히트맵) |
+| Windows | macOS |
 |:-:|:-:|
-| ![메인](screenshots/main.png) | ![재생](screenshots/playing_mode1.png) |
+| ![Windows](screenshots/playing_mode1.png) | ![macOS](screenshots/macos.png) |
 
-| 히트맵 & 타임라인 상세 | Handy 디바이스 연결 |
+| 히트맵 & 타임라인 | Handy 연결 |
 |:-:|:-:|
 | ![히트맵](screenshots/heatmap.png) | ![Handy](screenshots/handy_connect.png) |
 
@@ -52,6 +52,11 @@
 
 1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 최신 버전 다운로드
 2. 압축 해제 후 `ScriptPlayerPlus.exe` 실행 — 설치 불필요
+
+### macOS
+
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 `ScriptPlayerPlus-1.0.0-MacOS-Universal.zip` 다운로드
+2. 압축 해제 후 `ScriptPlayerPlus.app`을 Applications 폴더로 이동
 
 ### 소스에서 빌드
 

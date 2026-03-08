@@ -16,11 +16,11 @@
 
 ## Screenshots
 
-| Main Interface | Playing with Timeline & Heatmap |
+| Windows | macOS |
 |:-:|:-:|
-| ![Main](docs/screenshots/main.png) | ![Playing](docs/screenshots/playing_mode1.png) |
+| ![Windows](docs/screenshots/playing_mode1.png) | ![macOS](docs/screenshots/macos.png) |
 
-| Heatmap & Timeline Detail | Handy Device Connection |
+| Heatmap & Timeline | Handy Connection |
 |:-:|:-:|
 | ![Heatmap](docs/screenshots/heatmap.png) | ![Handy](docs/screenshots/handy_connect.png) |
 
@@ -52,6 +52,11 @@
 
 1. Download the latest release from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and run `ScriptPlayerPlus.exe` — no installation required
+
+### macOS
+
+1. Download `ScriptPlayerPlus-1.0.0-MacOS-Universal.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
+2. Extract and move `ScriptPlayerPlus.app` to Applications
 
 ### Build from Source
 

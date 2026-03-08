@@ -16,11 +16,11 @@
 
 ## 截图
 
-| 主界面 | 播放（时间线 + 热力图） |
+| Windows | macOS |
 |:-:|:-:|
-| ![主界面](screenshots/main.png) | ![播放](screenshots/playing_mode1.png) |
+| ![Windows](screenshots/playing_mode1.png) | ![macOS](screenshots/macos.png) |
 
-| 热力图和时间线详情 | Handy 设备连接 |
+| 热力图和时间线 | Handy 连接 |
 |:-:|:-:|
 | ![热力图](screenshots/heatmap.png) | ![Handy](screenshots/handy_connect.png) |
 
@@ -52,6 +52,11 @@
 
 1. 从 [Releases](https://github.com/sioaeko/scriptplayer-plus/releases) 下载最新版本
 2. 解压后运行 `ScriptPlayerPlus.exe` — 无需安装
+
+### macOS
+
+1. 从 [Releases](https://github.com/sioaeko/scriptplayer-plus/releases) 下载 `ScriptPlayerPlus-1.0.0-MacOS-Universal.zip`
+2. 解压后将 `ScriptPlayerPlus.app` 移动到 Applications 文件夹
 
 ### 从源码构建
 

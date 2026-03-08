@@ -16,11 +16,11 @@
 
 ## スクリーンショット
 
-| メイン画面 | 再生（タイムライン＋ヒートマップ） |
+| Windows | macOS |
 |:-:|:-:|
-| ![メイン](screenshots/main.png) | ![再生](screenshots/playing_mode1.png) |
+| ![Windows](screenshots/playing_mode1.png) | ![macOS](screenshots/macos.png) |
 
-| ヒートマップ＆タイムライン詳細 | Handyデバイス接続 |
+| ヒートマップ＆タイムライン | Handy接続 |
 |:-:|:-:|
 | ![ヒートマップ](screenshots/heatmap.png) | ![Handy](screenshots/handy_connect.png) |
 
@@ -52,6 +52,11 @@
 
 1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新バージョンをダウンロード
 2. 解凍して`ScriptPlayerPlus.exe`を実行 — インストール不要
+
+### macOS
+
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から`ScriptPlayerPlus-1.0.0-MacOS-Universal.zip`をダウンロード
+2. 解凍して`ScriptPlayerPlus.app`をApplicationsフォルダに移動
 
 ### ソースからビルド
 
