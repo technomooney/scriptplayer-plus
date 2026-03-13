@@ -16,32 +16,48 @@
 
 ## 스크린샷
 
-| Windows | macOS |
+| 오디오 재생 + 히트맵 | 오디오 재생 |
 |:-:|:-:|
-| ![Windows](screenshots/playing_mode1.png) | ![macOS](screenshots/macos.png) |
+| ![오디오 재생 + 히트맵](screenshots/VOICE_HM_TL.png) | ![오디오 재생](screenshots/VOICE_ASMR.png) |
 
-| 히트맵 & 타임라인 | Handy 연결 |
+| 타임라인 설정 | Windows 재생 |
 |:-:|:-:|
-| ![히트맵](screenshots/heatmap.png) | ![Handy](screenshots/handy_connect.png) |
+| ![타임라인 설정](screenshots/Timeline_setting.png) | ![Windows](screenshots/playing_mode1.png) |
 
-| EroScripts 검색 | 설정 (한국어) |
+| 히트맵 & 타임라인 | EroScripts 검색 |
 |:-:|:-:|
-| ![스크립트](screenshots/scripts_search.png) | ![설정](screenshots/setting_kor.png) |
+| ![히트맵](screenshots/heatmap.png) | ![스크립트](screenshots/scripts_search.png) |
+
+| 설정 (한국어) | macOS |
+|:-:|:-:|
+| ![설정](screenshots/setting_kor.png) | ![macOS](screenshots/macos.png) |
+
+## v0.1.2에서 추가된 내용
+
+- **오디오 재생 지원** — 앨범 아트 감지와 함께 로컬 오디오 파일을 재생하고 기존 Handy / funscript 흐름을 그대로 사용할 수 있습니다
+- **기본 타임라인 / 히트맵 표시 설정** — 스크립트가 있는 미디어를 열 때 타임라인과 히트맵을 기본으로 켤지 설정에서 선택할 수 있습니다
+- **더 깔끔한 초기 상태** — 새 설치 기준으로 타임라인과 히트맵은 둘 다 꺼진 상태에서 시작합니다
+- **커스텀 Windows 아이콘 복원** — 실행 파일 아이콘과 Windows 메타데이터를 다시 정리했습니다
+- **플레이어 UI 정리** — 버전 배지와 설정 화면이 새 기능에 맞게 다듬어졌습니다
 
 ## 주요 기능
 
-- **비디오 플레이어** — 로컬 영상 파일 재생 (MP4, MKV, AVI, WebM, MOV, WMV)
-- **펀스크립트 지원** — 영상과 같은 이름의 `.funscript` 파일 자동 로드
+- **비디오 + 오디오 플레이어** — 로컬 영상 파일(MP4, MKV, AVI, WebM, MOV, WMV)과 오디오 파일(MP3, WAV, FLAC, M4A, AAC, OGG, OPUS, WMA)을 재생합니다
+- **오디오 커버 아트 감지** — 같은 폴더에 있는 앨범 아트 / 커버 이미지를 자동으로 찾아 표시합니다
+- **펀스크립트 지원** — 미디어와 같은 이름의 `.funscript` 파일을 자동으로 로드합니다
 - **타임라인 시각화** — 스크립트 액션 포인트를 속도별 색상으로 실시간 표시
-- **히트맵** — 전체 영상의 강도를 색상으로 한눈에 확인 (초록 → 노랑 → 주황 → 빨강 → 보라)
+- **히트맵** — 전체 미디어의 강도를 색상으로 한눈에 확인합니다 (초록 → 노랑 → 주황 → 빨강 → 보라)
+- **기본 표시 설정 가능** — 설정에서 타임라인과 히트맵의 기본 표시 여부를 각각 지정할 수 있습니다
 - **The Handy 연동** — HSSP 프로토콜로 The Handy 디바이스와 동기화
   - 자동 연결 & 연결 기록
   - 스크립트 자동 업로드
   - 시간 오프셋 조정
   - 스트로크 범위 커스터마이징
 - **EroScripts 연동** — 앱 내 브라우저 로그인으로 펀스크립트 검색 및 다운로드 (API 키 불필요)
+  - 로그인 세션 로컬 유지
+  - 설정된 스크립트 저장 폴더로 직접 다운로드
 - **다국어 지원** — English, 한국어, 日本語, 中文
-- **드래그 & 드롭** — 영상 파일을 플레이어에 바로 드롭
+- **드래그 & 드롭** — 영상 또는 오디오 파일을 플레이어에 바로 드롭
 - **폴더 브라우저** — 하위 폴더 그룹핑 및 스크립트 유무 표시 (초록 체크마크)
 - **키보드 단축키** — Space, 방향키, F (전체화면), M (음소거) 등
 - **크로스 플랫폼** — Windows (스탠드얼론) 및 macOS (GitHub Actions)
@@ -50,12 +66,12 @@
 
 ### Windows
 
-1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 최신 버전 다운로드
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 최신 `ScriptPlayerPlus-0.1.2-Windows-x64.zip` 다운로드
 2. 압축 해제 후 `ScriptPlayerPlus.exe` 실행 — 설치 불필요
 
 ### macOS
 
-1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 `ScriptPlayerPlus-1.0.0-MacOS-Universal.zip` 다운로드
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 최신 macOS 빌드 다운로드
 2. 압축 해제 후 `ScriptPlayerPlus.app`을 Applications 폴더로 이동
 
 ### 소스에서 빌드

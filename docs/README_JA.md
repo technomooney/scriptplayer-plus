@@ -16,32 +16,48 @@
 
 ## スクリーンショット
 
-| Windows | macOS |
+| オーディオ再生 + ヒートマップ | オーディオ再生 |
 |:-:|:-:|
-| ![Windows](screenshots/playing_mode1.png) | ![macOS](screenshots/macos.png) |
+| ![オーディオ再生 + ヒートマップ](screenshots/VOICE_HM_TL.png) | ![オーディオ再生](screenshots/VOICE_ASMR.png) |
 
-| ヒートマップ＆タイムライン | Handy接続 |
+| タイムライン設定 | Windows再生 |
 |:-:|:-:|
-| ![ヒートマップ](screenshots/heatmap.png) | ![Handy](screenshots/handy_connect.png) |
+| ![タイムライン設定](screenshots/Timeline_setting.png) | ![Windows](screenshots/playing_mode1.png) |
 
-| EroScripts検索 | 設定 |
+| ヒートマップ＆タイムライン | EroScripts検索 |
 |:-:|:-:|
-| ![スクリプト](screenshots/scripts_search.png) | ![設定](screenshots/setting.png) |
+| ![ヒートマップ](screenshots/heatmap.png) | ![スクリプト](screenshots/scripts_search.png) |
+
+| 設定 | macOS |
+|:-:|:-:|
+| ![設定](screenshots/setting.png) | ![macOS](screenshots/macos.png) |
+
+## v0.1.2 の追加内容
+
+- **オーディオ再生対応** — アートワーク検出付きでローカル音声ファイルを再生し、既存の Handy / funscript ワークフローをそのまま使えます
+- **タイムライン / ヒートマップの初期表示設定** — スクリプト付きメディアを開いたときに、タイムラインとヒートマップを初期表示するか設定できます
+- **初回状態の整理** — 新規インストール時はタイムラインとヒートマップがどちらもオフで始まります
+- **Windows アイコンの復元** — カスタム実行ファイルアイコンと Windows メタデータを再適用しました
+- **プレーヤー UI の調整** — バージョンバッジと設定画面を新機能に合わせて改善しました
 
 ## 主な機能
 
-- **ビデオプレーヤー** — ローカル動画ファイルの再生（MP4、MKV、AVI、WebM、MOV、WMV）
-- **ファンスクリプト対応** — 動画と同名の`.funscript`ファイルを自動読み込み
+- **ビデオ + オーディオプレーヤー** — ローカル動画ファイル（MP4、MKV、AVI、WebM、MOV、WMV）と音声ファイル（MP3、WAV、FLAC、M4A、AAC、OGG、OPUS、WMA）を再生
+- **オーディオのアートワーク検出** — 同じフォルダ内のカバー画像を自動で見つけて表示します
+- **ファンスクリプト対応** — メディアと同名の `.funscript` ファイルを自動読み込み
 - **タイムライン表示** — スクリプトのアクションポイントを速度別の色でリアルタイム表示
-- **ヒートマップ** — 動画全体の強度を色で可視化（緑→黄→オレンジ→赤→紫）
+- **ヒートマップ** — メディア全体の強度を色で可視化（緑→黄→オレンジ→赤→紫）
+- **初期表示の切り替え** — 設定からタイムラインとヒートマップの初期表示を個別にオン / オフできます
 - **The Handy連携** — HSSPプロトコルでThe Handyデバイスと同期
   - 自動接続＆接続履歴
   - スクリプト自動アップロード
   - 時間オフセット調整
   - ストローク範囲のカスタマイズ
 - **EroScripts連携** — アプリ内ブラウザログインでファンスクリプトの検索・ダウンロード（APIキー不要）
+  - ログインセッションをローカル保持
+  - 設定したスクリプト保存フォルダへ直接ダウンロード
 - **多言語対応** — English、한국어、日本語、中文
-- **ドラッグ＆ドロップ** — 動画ファイルを直接プレーヤーにドロップ
+- **ドラッグ＆ドロップ** — 動画または音声ファイルを直接プレーヤーにドロップ
 - **フォルダブラウザ** — サブフォルダグループ化とスクリプト検出（緑チェックマーク）
 - **キーボードショートカット** — Space、矢印キー、F（フルスクリーン）、M（ミュート）など
 - **クロスプラットフォーム** — Windows（スタンドアロン）およびmacOS（GitHub Actions経由）
@@ -50,12 +66,12 @@
 
 ### Windows
 
-1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新バージョンをダウンロード
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新の `ScriptPlayerPlus-0.1.2-Windows-x64.zip` をダウンロード
 2. 解凍して`ScriptPlayerPlus.exe`を実行 — インストール不要
 
 ### macOS
 
-1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から`ScriptPlayerPlus-1.0.0-MacOS-Universal.zip`をダウンロード
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新の macOS ビルドをダウンロード
 2. 解凍して`ScriptPlayerPlus.app`をApplicationsフォルダに移動
 
 ### ソースからビルド
