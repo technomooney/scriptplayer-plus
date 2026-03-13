@@ -2,6 +2,7 @@
   "name": "scriptplayer-plus",
   "version": "0.1.2",
   "description": "ScriptPlayer+ - Funscript video player with Handy integration",
+  "license": "MIT",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
