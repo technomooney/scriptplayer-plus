@@ -230,6 +230,8 @@ export default function App() {
           onSeek={handleSeek}
           mediaRef={mediaRef}
           handyInfo={handyConnected ? { connected: true, ping: handyService.ping, uploadStatus: handyUploadStatus } : { connected: false, ping: null, uploadStatus: 'idle' as const }}
+          defaultShowHeatmap={settings.showHeatmapByDefault}
+          defaultShowTimeline={settings.showTimelineByDefault}
           timelineHeight={settings.timelineHeight}
           timelineWindow={settings.timelineWindow}
           speedColors={settings.speedColors}

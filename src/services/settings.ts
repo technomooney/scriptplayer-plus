@@ -8,6 +8,8 @@ export interface AppSettings {
   theme: 'dark' // only dark for now
 
   // Timeline
+  showHeatmapByDefault: boolean
+  showTimelineByDefault: boolean
   timelineHeight: number // px, 40-120
   timelineWindow: number // seconds, 5-30
   speedColors: boolean
@@ -23,6 +25,8 @@ export const defaultSettings: AppSettings = {
   defaultVideoFolder: '',
   scriptFolder: '',
   theme: 'dark',
+  showHeatmapByDefault: false,
+  showTimelineByDefault: false,
   timelineHeight: 64,
   timelineWindow: 10,
   speedColors: true,

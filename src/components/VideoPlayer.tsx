@@ -40,6 +40,8 @@ interface VideoPlayerProps {
   onSeek: (time: number) => void
   mediaRef: React.MutableRefObject<HTMLMediaElement | null>
   handyInfo?: HandyOverlayInfo | null
+  defaultShowHeatmap?: boolean
+  defaultShowTimeline?: boolean
   timelineHeight?: number
   timelineWindow?: number
   speedColors?: boolean
@@ -57,6 +59,8 @@ export default function VideoPlayer({
   onSeek,
   mediaRef,
   handyInfo,
+  defaultShowHeatmap = false,
+  defaultShowTimeline = false,
   timelineHeight = 64,
   timelineWindow = 10,
   speedColors = true,
@@ -65,8 +69,8 @@ export default function VideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
   const [showHandyOverlay, setShowHandyOverlay] = useState(false)
-  const [showHeatmap, setShowHeatmap] = useState(false)
-  const [showTimeline, setShowTimeline] = useState(true)
+  const [showHeatmap, setShowHeatmap] = useState(defaultShowHeatmap)
+  const [showTimeline, setShowTimeline] = useState(defaultShowTimeline)
   const handyOverlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -230,7 +234,9 @@ export default function VideoPlayer({
     setDuration(0)
     setPlaying(false)
     setShowControls(true)
-  }, [videoUrl])
+    setShowHeatmap(defaultShowHeatmap)
+    setShowTimeline(defaultShowTimeline)
+  }, [videoUrl, defaultShowHeatmap, defaultShowTimeline])
 
   return (
     <div

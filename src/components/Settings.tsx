@@ -243,6 +243,30 @@ function TimelineSection({
           onChange={(v) => update('speedColors', v)}
         />
       </FieldRow>
+
+      <Divider />
+
+      <FieldRow
+        label={t('settings.defaultShowTimeline')}
+        description={t('settings.defaultShowTimelineDesc')}
+      >
+        <Toggle
+          checked={settings.showTimelineByDefault}
+          onChange={(v) => update('showTimelineByDefault', v)}
+        />
+      </FieldRow>
+
+      <Divider />
+
+      <FieldRow
+        label={t('settings.defaultShowHeatmap')}
+        description={t('settings.defaultShowHeatmapDesc')}
+      >
+        <Toggle
+          checked={settings.showHeatmapByDefault}
+          onChange={(v) => update('showHeatmapByDefault', v)}
+        />
+      </FieldRow>
     </div>
   )
 }
