@@ -16,32 +16,44 @@
 
 ## Screenshots
 
-| Windows | macOS |
+| Windows Playback | Audio Playback |
 |:-:|:-:|
-| ![Windows](docs/screenshots/playing_mode1.png) | ![macOS](docs/screenshots/macos.png) |
+| ![Windows](docs/screenshots/playing_mode1.png) | ![Audio Playback](docs/screenshots/main.png) |
 
-| Heatmap & Timeline | Handy Connection |
+| Heatmap & Timeline | Settings |
 |:-:|:-:|
-| ![Heatmap](docs/screenshots/heatmap.png) | ![Handy](docs/screenshots/handy_connect.png) |
+| ![Heatmap](docs/screenshots/heatmap.png) | ![Settings](docs/screenshots/setting.png) |
 
-| EroScripts Search | Settings |
+| EroScripts Search | macOS |
 |:-:|:-:|
-| ![Scripts](docs/screenshots/scripts_search.png) | ![Settings](docs/screenshots/setting.png) |
+| ![Scripts](docs/screenshots/scripts_search.png) | ![macOS](docs/screenshots/macos.png) |
+
+## What's New In v0.1.2
+
+- **Audio Playback Support** — Play local audio files with artwork detection and the same Handy/funscript workflow
+- **Default Timeline Visibility Settings** — Choose whether the timeline and heatmap start enabled when opening scripted media
+- **Cleaner First Launch** — New installs start with both timeline and heatmap turned off by default
+- **Custom Windows App Icon** — Restored custom executable icon and updated Windows metadata/version info
+- **Refined Player UI** — Improved title bar version badge and updated settings to match the new playback options
 
 ## Features
 
-- **Video Player** — Play local video files (MP4, MKV, AVI, WebM, MOV, WMV) with full playback controls
-- **Funscript Support** — Automatically loads matching `.funscript` files alongside videos
+- **Video + Audio Player** — Play local video files (MP4, MKV, AVI, WebM, MOV, WMV) and audio files (MP3, WAV, FLAC, M4A, AAC, OGG, OPUS, WMA)
+- **Artwork Detection For Audio** — Automatically picks matching cover art from the media folder when available
+- **Funscript Support** — Automatically loads matching `.funscript` files alongside local media
 - **Timeline Visualization** — Real-time scrolling timeline showing script action points with speed-based colors
-- **Heatmap** — Full-video intensity heatmap (green → yellow → orange → red → purple)
+- **Heatmap** — Full-media intensity heatmap (green → yellow → orange → red → purple)
+- **Configurable Default View** — Timeline and heatmap can be enabled or disabled by default from Settings
 - **The Handy Integration** — Connect and sync The Handy device via HSSP protocol
   - Auto-connect & connection history
   - Script auto-upload to Handy servers
   - Time offset adjustment
   - Stroke range customization
 - **EroScripts Integration** — Search and download funscripts directly from EroScripts via in-app browser login (no API key needed)
+  - Session-based login persisted locally
+  - Direct download into the configured script storage folder
 - **Multi-Language** — English, 한국어, 日本語, 中文
-- **Drag & Drop** — Drop video files directly into the player
+- **Drag & Drop** — Drop video or audio files directly into the player
 - **Folder Browser** — Browse folders with subfolder grouping and script detection (green checkmark)
 - **Keyboard Shortcuts** — Space, Arrow keys, F (fullscreen), M (mute), and more
 - **Cross-Platform** — Windows (standalone) and macOS (via GitHub Actions)
@@ -50,7 +62,7 @@
 
 ### Windows
 
-1. Download the latest release from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
+1. Download the latest `ScriptPlayerPlus-0.1.2-Windows-x64.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and run `ScriptPlayerPlus.exe` — no installation required
 
 ### macOS
