@@ -1,4 +1,4 @@
-import { SubtitleCue } from '../types'
+import { SubtitleCue, SubtitleFile } from '../types'
 
 const RANGE_LINE_RE = /^\[?((?:(?:\d{1,2}):)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)\]?\s*(?:-->|~|[-–—])\s*\[?((?:(?:\d{1,2}):)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)\]?\s*(.*)$/
 const START_LINE_RE = /^(?:\d+\s*[.)-]?\s*)?\[?((?:(?:\d{1,2}):)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)\]?\s*(.*)$/
@@ -133,6 +133,75 @@ export function getActiveSubtitleText(cues: SubtitleCue[], currentTime: number):
     .join('\n')
 }
 
+export function isLikelyMatchingVideoSubtitle(mediaPath: string, subtitleFile: SubtitleFile): boolean {
+  return getVideoSubtitleMatchScore(mediaPath, subtitleFile) >= 0
+}
+
+export function getVideoSubtitleMatchScore(mediaPath: string, subtitleFile: SubtitleFile): number {
+  const mediaInfo = buildSubtitleMatchInfo(mediaPath, '')
+  const subtitleInfo = buildSubtitleMatchInfo(subtitleFile.path, subtitleFile.content)
+
+  const mediaHasEpisode = mediaInfo.episodeKeys.length > 0
+  const subtitleHasEpisode = subtitleInfo.episodeKeys.length > 0
+  const sharesEpisode = hasSharedValue(mediaInfo.episodeKeys, subtitleInfo.episodeKeys)
+  const sharedTitleTokenCount = countSharedTokens(mediaInfo.titleTokens, subtitleInfo.titleTokens)
+  const sharedFolderTokenCount = countSharedTokens(mediaInfo.folderTokens, subtitleInfo.folderTokens)
+  const sharedContextTokenCount = countSharedTokens(mediaInfo.contextTokens, subtitleInfo.contextTokens)
+  const hasDirectTitleOverlap = hasOverlappingPhrase(mediaInfo.titlePhrases, subtitleInfo.titlePhrases)
+  const hasDirectContextOverlap = hasOverlappingPhrase(mediaInfo.contextPhrases, subtitleInfo.contextPhrases)
+  const hasStrongTitleEvidence = hasDirectTitleOverlap || sharedTitleTokenCount > 0 || subtitleInfo.directNameHints > 0
+  const hasWorkEvidence = hasStrongTitleEvidence
+    || sharedFolderTokenCount > 0
+    || hasDirectContextOverlap
+    || sharedContextTokenCount >= 2
+  const reliesOnlyOnFolderContext = !hasStrongTitleEvidence
+    && sharedTitleTokenCount === 0
+    && !hasDirectTitleOverlap
+    && (sharedFolderTokenCount > 0 || hasDirectContextOverlap || sharedContextTokenCount >= 2)
+
+  if (mediaHasEpisode) {
+    if (!subtitleHasEpisode) return -1
+    if (!sharesEpisode) return -1
+  } else if (subtitleHasEpisode && !hasStrongTitleEvidence && sharedContextTokenCount < 2) {
+    return -1
+  }
+
+  if (subtitleInfo.hasExplicitTitle && reliesOnlyOnFolderContext) {
+    return -1
+  }
+
+  let score = 0
+
+  if (mediaHasEpisode && sharesEpisode) score += 600
+  if (hasDirectTitleOverlap) score += 380
+  if (hasDirectContextOverlap && !hasDirectTitleOverlap) score += 160
+  if (sharedTitleTokenCount > 0) score += sharedTitleTokenCount * 220
+  if (sharedFolderTokenCount > 0) score += sharedFolderTokenCount * 140
+  if (sharedContextTokenCount > sharedTitleTokenCount + sharedFolderTokenCount) {
+    score += (sharedContextTokenCount - sharedTitleTokenCount - sharedFolderTokenCount) * 60
+  }
+  if (subtitleInfo.directNameHints > 0) score += subtitleInfo.directNameHints * 90
+
+  if (mediaHasEpisode && sharesEpisode && subtitleInfo.isEpisodeOnly && hasWorkEvidence) {
+    score += 180
+  }
+
+  if (mediaHasEpisode && sharesEpisode && !subtitleInfo.hasExplicitTitle && hasWorkEvidence) {
+    score += 120
+  }
+
+  if (mediaHasEpisode && sharesEpisode && !sharesDominantScript(mediaInfo.titleTokens, subtitleInfo.titleTokens) && hasWorkEvidence) {
+    score += 80
+  }
+
+  if (mediaHasEpisode) {
+    if (!hasWorkEvidence && !subtitleInfo.isEpisodeOnly) return -1
+    return score >= 650 ? score : -1
+  }
+
+  return hasWorkEvidence ? score : -1
+}
+
 function parseFlexibleTimestamp(value: string): number | null {
   const normalized = value.trim().replace(/^\[|\]$/g, '').replace(',', '.')
   const parts = normalized.split(':')
@@ -186,4 +255,228 @@ function sanitizeCueText(text: string): string {
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .trim()
+}
+
+interface SubtitleMatchInfo {
+  titleTokens: string[]
+  folderTokens: string[]
+  contextTokens: string[]
+  titlePhrases: string[]
+  contextPhrases: string[]
+  episodeKeys: string[]
+  directNameHints: number
+  hasExplicitTitle: boolean
+  isEpisodeOnly: boolean
+}
+
+function buildSubtitleMatchInfo(filePath: string, content: string): SubtitleMatchInfo {
+  const ext = getFileExtension(filePath)
+  const fileStem = filePath.toLowerCase().endsWith(ext) ? filePath.slice(0, -ext.length) : filePath
+  const fileName = fileStem.split(/[\\/]/).pop() || fileStem
+  const pathSegments = filePath.split(/[\\/]+/).filter(Boolean)
+  const folderNames = pathSegments.slice(Math.max(0, pathSegments.length - 3), -1)
+  const headerText = extractSubtitleHeaderText(content)
+  const normalizedName = normalizeSubtitleMatchText(fileName)
+  const normalizedHeader = normalizeSubtitleMatchText(headerText)
+  const normalizedFolders = folderNames
+    .map((segment) => normalizeSubtitleMatchText(segment))
+    .filter(Boolean)
+  const titlePhrases = uniqueValues([
+    extractTitlePhrase(normalizedName),
+    extractTitlePhrase(normalizedHeader),
+  ].filter(Boolean))
+  const contextPhrases = uniqueValues([
+    ...titlePhrases,
+    ...normalizedFolders.map((value) => extractTitlePhrase(value)).filter(Boolean),
+  ])
+  const titleTokens = tokenizeSubtitleMatchText(titlePhrases.join(' '))
+  const folderTokens = tokenizeSubtitleMatchText(normalizedFolders.join(' '))
+  const contextTokens = tokenizeSubtitleMatchText(contextPhrases.join(' '))
+  const episodeKeys = Array.from(new Set([
+    ...extractEpisodeKeys(fileName),
+    ...extractEpisodeKeys(headerText),
+  ]))
+  let directNameHints = 0
+
+  if (normalizedHeader && normalizedName && (
+    normalizedHeader.includes(normalizedName)
+    || normalizedName.includes(normalizedHeader)
+  )) {
+    directNameHints += 2
+  }
+
+  if (normalizedName && normalizedFolders.some((folder) => (
+    folder.includes(normalizedName)
+    || normalizedName.includes(folder)
+  ))) {
+    directNameHints += 1
+  }
+
+  return {
+    titleTokens,
+    folderTokens,
+    contextTokens,
+    titlePhrases,
+    contextPhrases,
+    episodeKeys,
+    directNameHints,
+    hasExplicitTitle: titleTokens.length > 0,
+    isEpisodeOnly: episodeKeys.length > 0 && titleTokens.length === 0,
+  }
+}
+
+function extractSubtitleHeaderText(content: string): string {
+  const lines = normalizeContent(content).split('\n')
+  const collected: string[] = []
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) continue
+    if (line === 'WEBVTT') continue
+    if (/^\d+$/.test(line)) continue
+    if (line.includes('-->')) continue
+    if (RANGE_LINE_RE.test(line) || START_LINE_RE.test(line)) continue
+    if (/^(NOTE|STYLE|REGION)\b/i.test(line)) continue
+
+    collected.push(line)
+    if (collected.length >= 8) break
+  }
+
+  return collected.join(' ')
+}
+
+function normalizeSubtitleMatchText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\[[^\]]*]/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b(19|20)\d{2}\b/g, ' ')
+    .replace(/\b(2160p|1440p|1080p|720p|480p|x264|x265|h264|h265|hevc|av1|web[- ]?dl|blu[- ]?ray|bdrip|webrip|hdr|uhd|10bit|8bit|aac|flac|opus|subtitles?|captions?)\b/gi, ' ')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tokenizeSubtitleMatchText(value: string): string[] {
+  return (value.match(/[a-z0-9\u3131-\u318E\uAC00-\uD7A3\u3040-\u30FF\u4E00-\u9FFF]+/gi) ?? [])
+    .filter((token, index, all) => isMeaningfulMatchToken(token) && all.indexOf(token) === index)
+}
+
+function extractEpisodeKeys(value: string): string[] {
+  const keys = new Set<string>()
+  const normalized = value.toLowerCase()
+
+  for (const match of normalized.matchAll(/\bs(\d{1,2})\s*[-_. ]?\s*e(\d{1,3})\b/g)) {
+    keys.add(`s${Number(match[1])}e${Number(match[2])}`)
+    keys.add(`e${Number(match[2])}`)
+  }
+
+  for (const match of normalized.matchAll(/\b(?:ep|episode|e)\s*[-_. ]?(\d{1,3})\b/g)) {
+    keys.add(`e${Number(match[1])}`)
+  }
+
+  for (const match of normalized.matchAll(/第\s*(\d{1,3})\s*[화話话회]\b/g)) {
+    keys.add(`e${Number(match[1])}`)
+  }
+
+  for (const match of normalized.matchAll(/\b(\d{1,3})\s*(?:화|話|话|회)\b/g)) {
+    keys.add(`e${Number(match[1])}`)
+  }
+
+  const compact = normalizeSubtitleMatchText(value).replace(/\s+/g, ' ').trim()
+  if (/^(?:episode|ep|e)?\s*\d{1,3}$/i.test(compact)) {
+    const numberMatch = compact.match(/(\d{1,3})/)
+    if (numberMatch) {
+      keys.add(`e${Number(numberMatch[1])}`)
+    }
+  }
+
+  return Array.from(keys)
+}
+
+function countSharedTokens(left: string[], right: string[]): number {
+  if (left.length === 0 || right.length === 0) return 0
+  const rightSet = new Set(right)
+  return left.filter((token) => rightSet.has(token)).length
+}
+
+function hasSharedValue(left: string[], right: string[]): boolean {
+  if (left.length === 0 || right.length === 0) return false
+  const rightSet = new Set(right)
+  return left.some((value) => rightSet.has(value))
+}
+
+function sharesDominantScript(left: string[], right: string[]): boolean {
+  const leftScripts = new Set(left.map(detectTokenScript).filter(Boolean))
+  const rightScripts = new Set(right.map(detectTokenScript).filter(Boolean))
+  if (leftScripts.size === 0 || rightScripts.size === 0) return false
+  return Array.from(leftScripts).some((script) => rightScripts.has(script))
+}
+
+function extractTitlePhrase(value: string): string {
+  return value
+    .replace(/\bs\d{1,2}\s*e\d{1,3}\b/gi, ' ')
+    .replace(/\b(?:ep|episode|e)\s*[-_. ]?\d{1,3}\b/gi, ' ')
+    .replace(/第\s*\d{1,3}\s*[화話话회]/g, ' ')
+    .replace(/\b\d{1,3}\s*(?:화|話|话|회)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function hasOverlappingPhrase(left: string[], right: string[]): boolean {
+  for (const leftValue of left) {
+    for (const rightValue of right) {
+      if (!leftValue || !rightValue) continue
+      if (leftValue === rightValue) return true
+      if (leftValue.length >= 6 && rightValue.includes(leftValue)) return true
+      if (rightValue.length >= 6 && leftValue.includes(rightValue)) return true
+    }
+  }
+
+  return false
+}
+
+function isMeaningfulMatchToken(token: string): boolean {
+  if (token.length <= 1) return false
+  if (/^\d+$/.test(token)) return false
+  if (/^s\d+e\d+$/.test(token)) return false
+  if (/^(?:ep|episode|e)\d+$/.test(token)) return false
+
+  return ![
+    'subtitle',
+    'subtitles',
+    'subs',
+    'caption',
+    'captions',
+    'lyrics',
+    'lyric',
+    'script',
+    'scripts',
+    'translation',
+    'translated',
+    'transcript',
+    '자막',
+    '대본',
+    '번역',
+    '스크립트',
+    '가사',
+    '字幕',
+    '翻译',
+    '翻譯',
+    '脚本',
+    '歌詞',
+    '歌词',
+  ].includes(token)
+}
+
+function uniqueValues(values: string[]): string[] {
+  return values.filter((value, index) => values.indexOf(value) === index)
+}
+
+function detectTokenScript(token: string): string | null {
+  if (/[a-z]/i.test(token)) return 'latin'
+  if (/[\uAC00-\uD7A3\u3131-\u318E]/.test(token)) return 'hangul'
+  if (/[\u3040-\u30FF]/.test(token)) return 'kana'
+  if (/[\u4E00-\u9FFF]/.test(token)) return 'han'
+  return null
 }

@@ -4,6 +4,7 @@ import fs from 'fs'
 import http from 'http'
 import https from 'https'
 import { URL } from 'url'
+import { getVideoSubtitleMatchScore, parseSubtitleFile } from '../src/services/subtitles'
 
 const isMac = process.platform === 'darwin'
 const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.webm', '.mov', '.wmv']
@@ -115,10 +116,32 @@ ipcMain.handle('dialog:openFolder', async () => {
   return result.filePaths[0]
 })
 
+ipcMain.handle('dialog:openScriptFile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Funscript', extensions: ['funscript', 'json'] },
+    ],
+  })
+  if (result.canceled) return null
+  return result.filePaths[0]
+})
+
+ipcMain.handle('dialog:openSubtitleFile', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Subtitles', extensions: SUBTITLE_EXTS.map((ext) => ext.slice(1)) },
+    ],
+  })
+  if (result.canceled) return null
+  return result.filePaths[0]
+})
+
 // File system operations
 ipcMain.handle('fs:readDir', async (_event, dirPath: string) => {
   try {
-    const files: Array<{ name: string; path: string; type: 'video' | 'audio'; hasScript: boolean; relativePath: string }> = []
+    const files: Array<{ name: string; path: string; type: 'video' | 'audio'; hasScript: boolean; hasSubtitles: boolean; relativePath: string }> = []
 
     function scanDir(dir: string, prefix: string) {
       let entries: fs.Dirent[]
@@ -136,11 +159,13 @@ ipcMain.handle('fs:readDir', async (_event, dirPath: string) => {
           if (MEDIA_EXTS.includes(ext)) {
             const baseName = path.basename(entry.name, ext)
             const scriptPath = path.join(dir, baseName + '.funscript')
+            const hasSubtitles = findSubtitleFilesForMedia(fullPath).length > 0
             files.push({
               name: entry.name,
               path: fullPath,
               type: VIDEO_EXTS.includes(ext) ? 'video' : 'audio',
               hasScript: fs.existsSync(scriptPath),
+              hasSubtitles,
               relativePath: prefix ? prefix + '/' + entry.name : entry.name,
             })
           }
@@ -222,6 +247,26 @@ ipcMain.handle('fs:readSubtitles', async (_event, mediaPath: string) => {
   }
 })
 
+ipcMain.handle('fs:readFunscriptFile', async (_event, filePath: string) => {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('fs:readSubtitleFile', async (_event, filePath: string) => {
+  try {
+    return {
+      path: filePath,
+      content: readSubtitleContent(filePath),
+    }
+  } catch {
+    return null
+  }
+})
+
 // ============================================================
 // NAS (WebDAV / FTP) Service
 // ============================================================
@@ -277,12 +322,29 @@ function findSubtitleFilesForMedia(mediaPath: string): string[] {
   const mediaDir = path.dirname(mediaPath)
   const ext = path.extname(mediaPath)
   const baseName = path.basename(mediaPath, ext).toLowerCase()
+  const mediaType = VIDEO_EXTS.includes(ext.toLowerCase()) ? 'video' : 'audio'
 
   return collectSubtitleCandidates(mediaDir)
-    .map((filePath) => ({
-      filePath,
-      score: scoreSubtitleCandidate(filePath, mediaDir, baseName),
-    }))
+    .map((filePath) => {
+      const content = readSubtitleContent(filePath)
+      const cues = parseSubtitleFile(content, filePath)
+      if (cues.length === 0) return null
+
+      const fileScore = scoreSubtitleCandidate(filePath, mediaDir, baseName)
+      const videoScore = mediaType === 'video'
+        ? getVideoSubtitleMatchScore(mediaPath, { path: filePath, content })
+        : 0
+
+      if (mediaType === 'video' && videoScore < 0) {
+        return null
+      }
+
+      return {
+        filePath,
+        score: fileScore + videoScore,
+      }
+    })
+    .filter((entry): entry is { filePath: string; score: number } => entry !== null)
     .sort((a, b) => b.score - a.score || a.filePath.localeCompare(b.filePath))
     .map(({ filePath }) => filePath)
 }
@@ -335,23 +397,74 @@ function scoreSubtitleCandidate(filePath: string, mediaDir: string, baseName: st
   const stem = path.basename(filePath, ext).toLowerCase()
   const fileName = path.basename(filePath).toLowerCase()
   const relativeDir = path.relative(mediaDir, path.dirname(filePath)).toLowerCase()
+  const normalizedBaseName = normalizeSubtitleMatchName(baseName)
+  const normalizedStem = normalizeSubtitleMatchName(stem)
+  const mediaTokens = tokenizeSubtitleMatchName(normalizedBaseName)
+  const subtitleTokens = tokenizeSubtitleMatchName(normalizedStem)
+  const sharedTokenCount = countSharedTokens(mediaTokens, subtitleTokens)
+  const hasDirectNameMatch = stem === baseName
+    || normalizedStem === normalizedBaseName
+    || normalizedStem.startsWith(`${normalizedBaseName}.`)
+    || normalizedStem.startsWith(normalizedBaseName)
+    || normalizedBaseName.startsWith(normalizedStem)
+    || normalizedStem.includes(normalizedBaseName)
+    || normalizedBaseName.includes(normalizedStem)
+  const hasKeywordHint = directoryLooksLikeSubtitle(relativeDir)
+    || fileName.includes('subtitle')
+    || fileName.includes('caption')
+    || fileName.includes('lyrics')
+    || fileName.includes('자막')
+    || fileName.includes('대본')
+    || fileName.includes('번역')
 
   let score = 0
 
-  if (ext === '.vtt') score += 400
-  else if (ext === '.srt') score += 320
-  else if (ext === '.txt') score += 240
+  if (ext === '.vtt') score += 120
+  else if (ext === '.srt') score += 90
+  else if (ext === '.txt') score += 60
 
-  if (path.dirname(filePath) === mediaDir) score += 120
-  if (stem === baseName) score += 1200
-  else if (stem.startsWith(`${baseName}.`)) score += 950
-  else if (stem.includes(baseName)) score += 700
+  if (path.dirname(filePath) === mediaDir) score += 40
+  if (stem === baseName) score += 1600
+  else if (normalizedStem === normalizedBaseName && normalizedStem) score += 1350
+  else if (stem.startsWith(`${baseName}.`) || normalizedStem.startsWith(`${normalizedBaseName}.`)) score += 1200
+  else if (normalizedStem.startsWith(normalizedBaseName) || normalizedBaseName.startsWith(normalizedStem)) score += 950
+  else if (normalizedStem.includes(normalizedBaseName) || normalizedBaseName.includes(normalizedStem)) score += 700
+
+  if (sharedTokenCount > 0) {
+    score += sharedTokenCount * 180
+  }
 
   if (directoryLooksLikeSubtitle(relativeDir)) score += 180
   if (fileName.includes('subtitle') || fileName.includes('caption') || fileName.includes('lyrics')) score += 80
   if (fileName.includes('자막') || fileName.includes('대본') || fileName.includes('번역')) score += 80
 
+  if (!hasDirectNameMatch && sharedTokenCount === 0) {
+    score -= hasKeywordHint ? 120 : 600
+  }
+
   return score
+}
+
+function normalizeSubtitleMatchName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\[[^\]]*]/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b(19|20)\d{2}\b/g, ' ')
+    .replace(/\b(2160p|1440p|1080p|720p|480p|x264|x265|h264|h265|hevc|av1|web[- ]?dl|blu[- ]?ray|bdrip|webrip|hdr|uhd|10bit|8bit|aac|flac|opus)\b/gi, ' ')
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tokenizeSubtitleMatchName(value: string): string[] {
+  return value.match(/[a-z0-9\u3131-\u318E\uAC00-\uD7A3\u4E00-\u9FFF]+/gi) ?? []
+}
+
+function countSharedTokens(left: string[], right: string[]): number {
+  if (left.length === 0 || right.length === 0) return 0
+  const rightSet = new Set(right)
+  return left.filter((token, index) => token.length > 1 && left.indexOf(token) === index && rightSet.has(token)).length
 }
 
 function readSubtitleContent(filePath: string): string {

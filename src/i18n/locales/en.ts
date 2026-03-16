@@ -8,6 +8,10 @@ const en: Record<string, string> = {
   'sidebar.filterFiles': 'Filter files...',
   'sidebar.noFiles': 'Open a folder to browse media files',
   'sidebar.noMatch': 'No matching files',
+  'sidebar.selectScript': 'Select Script...',
+  'sidebar.selectSubtitle': 'Select Subtitle...',
+  'sidebar.clearManualScript': 'Clear Manual Script',
+  'sidebar.clearManualSubtitle': 'Clear Manual Subtitle',
 
   'player.noVideo': 'Open a folder or drag a video or audio file to start',
   'player.audioMode': 'Audio playback',

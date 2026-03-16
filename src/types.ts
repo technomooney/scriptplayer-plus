@@ -30,6 +30,7 @@ export interface VideoFile {
   path: string
   type: MediaType
   hasScript: boolean
+  hasSubtitles: boolean
   relativePath?: string
 }
 
@@ -66,12 +67,16 @@ declare global {
       close: () => void
       openVideo: () => Promise<string | null>
       openFolder: () => Promise<string | null>
+      openScriptFile: () => Promise<string | null>
+      openSubtitleFile: () => Promise<string | null>
       readDir: (path: string) => Promise<VideoFile[]>
       readFunscript: (videoPath: string, scriptFolder?: string) => Promise<Funscript | null>
+      readFunscriptFile: (filePath: string) => Promise<Funscript | null>
       saveFunscript: (videoPath: string, data: string) => Promise<boolean>
       getVideoUrl: (filePath: string) => Promise<string>
       findArtwork: (mediaPath: string) => Promise<string | null>
       readSubtitles: (mediaPath: string) => Promise<SubtitleFile[]>
+      readSubtitleFile: (filePath: string) => Promise<SubtitleFile | null>
 
       // EroScripts
       eroscriptsCheckSession: () => Promise<{ loggedIn: boolean; username: string }>

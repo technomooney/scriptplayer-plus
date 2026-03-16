@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import VideoPlayer from './components/VideoPlayer'
@@ -7,7 +7,7 @@ import { VideoFile, Funscript, FunscriptAction, MediaType, SubtitleCue, Subtitle
 import { parseFunscript } from './services/funscript'
 import { handyService, HandyUploadStatus } from './services/handy'
 import { AppSettings, loadSettings, saveSettings } from './services/settings'
-import { parseSubtitleFile } from './services/subtitles'
+import { getVideoSubtitleMatchScore, parseSubtitleFile } from './services/subtitles'
 import { useTranslation } from './i18n'
 
 const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.webm', '.mov', '.wmv']
@@ -34,9 +34,19 @@ export default function App() {
   const [handyUploadStatus, setHandyUploadStatus] = useState<HandyUploadStatus>('idle')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
+  const [manualScriptPaths, setManualScriptPaths] = useState<Record<string, string>>({})
+  const [manualSubtitleFiles, setManualSubtitleFiles] = useState<Record<string, SubtitleFile>>({})
   const mediaRef = useRef<HTMLMediaElement | null>(null)
 
   const actions: FunscriptAction[] = funscript?.actions || []
+  const displayFiles = useMemo(
+    () => files.map((file) => ({
+      ...file,
+      hasScript: file.hasScript || Boolean(manualScriptPaths[file.path]),
+      hasSubtitles: file.hasSubtitles || Boolean(manualSubtitleFiles[file.path]),
+    })),
+    [files, manualScriptPaths, manualSubtitleFiles]
+  )
 
   // Listen for Handy upload status changes
   useEffect(() => {
@@ -57,6 +67,27 @@ export default function App() {
     setSettings(newSettings)
     saveSettings(newSettings)
   }, [])
+
+  const loadSubtitleCues = useCallback(async (mediaPath: string, mediaType: MediaType) => {
+    const manualSubtitle = manualSubtitleFiles[mediaPath]
+    if (manualSubtitle) {
+      return parseSubtitleFile(manualSubtitle.content, manualSubtitle.path)
+    }
+
+    const subtitleFiles = await window.electronAPI.readSubtitles(mediaPath)
+    return selectSubtitleCues(mediaPath, mediaType, subtitleFiles)
+  }, [manualSubtitleFiles])
+
+  const loadScript = useCallback(async (mediaPath: string) => {
+    const manualScriptPath = manualScriptPaths[mediaPath]
+    if (manualScriptPath) {
+      const manualScript = await window.electronAPI.readFunscriptFile(manualScriptPath)
+      return manualScript ? parseFunscript(manualScript) : null
+    }
+
+    const script = await window.electronAPI.readFunscript(mediaPath, settings.scriptFolder)
+    return script ? parseFunscript(script) : null
+  }, [manualScriptPaths, settings.scriptFolder])
 
 
   const handleOpenFolder = useCallback(async () => {
@@ -88,21 +119,87 @@ export default function App() {
       }
     }
 
-    const subtitleFiles = await window.electronAPI.readSubtitles(filePath)
-    setSubtitleCues(selectSubtitleCues(subtitleFiles))
+    setSubtitleCues(await loadSubtitleCues(filePath, resolvedType))
 
-    const script = await window.electronAPI.readFunscript(filePath, settings.scriptFolder)
-    const parsed = script ? parseFunscript(script) : null
+    const parsed = await loadScript(filePath)
     setFunscript(parsed)
 
     if (parsed && handyService.isConnected) {
       uploadToHandy(parsed.actions)
     }
-  }, [settings.scriptFolder])
+  }, [loadScript, loadSubtitleCues])
 
   const handleFileSelect = useCallback(async (file: VideoFile) => {
     await openMediaFile(file.path, file.type)
   }, [openMediaFile])
+
+  const handleManualScriptSelect = useCallback(async (file: VideoFile) => {
+    const scriptPath = await window.electronAPI.openScriptFile()
+    if (!scriptPath) return
+
+    setManualScriptPaths((prev) => ({ ...prev, [file.path]: scriptPath }))
+
+    if (currentFile === file.path) {
+      const parsed = await window.electronAPI.readFunscriptFile(scriptPath)
+      const nextScript = parsed ? parseFunscript(parsed) : null
+      setFunscript(nextScript)
+
+      if (nextScript && handyService.isConnected) {
+        uploadToHandy(nextScript.actions)
+      } else {
+        setScriptUploadUrl(null)
+      }
+    }
+  }, [currentFile])
+
+  const handleManualSubtitleSelect = useCallback(async (file: VideoFile) => {
+    const subtitlePath = await window.electronAPI.openSubtitleFile()
+    if (!subtitlePath) return
+
+    const subtitleFile = await window.electronAPI.readSubtitleFile(subtitlePath)
+    if (!subtitleFile) return
+    const cues = parseSubtitleFile(subtitleFile.content, subtitleFile.path)
+    if (cues.length === 0) return
+
+    setManualSubtitleFiles((prev) => ({ ...prev, [file.path]: subtitleFile }))
+
+    if (currentFile === file.path) {
+      setSubtitleCues(cues)
+    }
+  }, [currentFile])
+
+  const handleClearManualScript = useCallback(async (file: VideoFile) => {
+    setManualScriptPaths((prev) => {
+      const next = { ...prev }
+      delete next[file.path]
+      return next
+    })
+
+    if (currentFile === file.path) {
+      const script = await window.electronAPI.readFunscript(file.path, settings.scriptFolder)
+      const parsed = script ? parseFunscript(script) : null
+      setFunscript(parsed)
+
+      if (parsed && handyService.isConnected) {
+        uploadToHandy(parsed.actions)
+      } else {
+        setScriptUploadUrl(null)
+      }
+    }
+  }, [currentFile, settings.scriptFolder])
+
+  const handleClearManualSubtitle = useCallback(async (file: VideoFile) => {
+    setManualSubtitleFiles((prev) => {
+      const next = { ...prev }
+      delete next[file.path]
+      return next
+    })
+
+    if (currentFile === file.path) {
+      const subtitleFiles = await window.electronAPI.readSubtitles(file.path)
+      setSubtitleCues(selectSubtitleCues(file.path, file.type, subtitleFiles))
+    }
+  }, [currentFile])
 
   const uploadToHandy = async (scriptActions: FunscriptAction[]) => {
     const url = await handyService.uploadAndSetup(scriptActions)
@@ -216,10 +313,16 @@ export default function App() {
       <TitleBar onOpenSettings={() => setSettingsOpen(true)} />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar
-          files={files}
+          files={displayFiles}
           currentFile={currentFile}
           onFileSelect={handleFileSelect}
           onOpenFolder={handleOpenFolder}
+          onManualScriptSelect={handleManualScriptSelect}
+          onManualSubtitleSelect={handleManualSubtitleSelect}
+          onClearManualScript={handleClearManualScript}
+          onClearManualSubtitle={handleClearManualSubtitle}
+          manualScriptPaths={new Set(Object.keys(manualScriptPaths))}
+          manualSubtitlePaths={new Set(Object.keys(manualSubtitleFiles))}
           handyConnected={handyConnected}
           onHandyConnect={handleHandyConnect}
           onHandyDisconnect={handleHandyDisconnect}
@@ -261,13 +364,30 @@ function getFileName(filePath: string): string {
   return filePath.split(/[\\/]/).pop() || ''
 }
 
-function selectSubtitleCues(subtitleFiles: SubtitleFile[]): SubtitleCue[] {
+function selectSubtitleCues(mediaPath: string, mediaType: MediaType, subtitleFiles: SubtitleFile[]): SubtitleCue[] {
+  if (mediaType === 'audio') {
+    for (const subtitleFile of subtitleFiles) {
+      const cues = parseSubtitleFile(subtitleFile.content, subtitleFile.path)
+      if (cues.length > 0) {
+        return cues
+      }
+    }
+
+    return []
+  }
+
+  let bestMatch: { score: number; cues: SubtitleCue[] } | null = null
+
   for (const subtitleFile of subtitleFiles) {
     const cues = parseSubtitleFile(subtitleFile.content, subtitleFile.path)
-    if (cues.length > 0) {
-      return cues
+    if (cues.length === 0) continue
+
+    const score = getVideoSubtitleMatchScore(mediaPath, subtitleFile)
+    if (score < 0) continue
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { score, cues }
     }
   }
 
-  return []
+  return bestMatch?.cues ?? []
 }

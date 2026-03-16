@@ -8,6 +8,10 @@ const ko: Record<string, string> = {
   'sidebar.filterFiles': '\uD30C\uC77C \uAC80\uC0C9...',
   'sidebar.noFiles': '\uD3F4\uB354\uB97C \uC5F4\uC5B4 \uBBF8\uB514\uC5B4 \uD30C\uC77C\uC744 \uD0D0\uC0C9\uD558\uC138\uC694',
   'sidebar.noMatch': '\uC77C\uCE58\uD558\uB294 \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4',
+  'sidebar.selectScript': '\uC2A4\uD06C\uB9BD\uD2B8 \uC120\uD0DD...',
+  'sidebar.selectSubtitle': '\uC790\uB9C9 \uC120\uD0DD...',
+  'sidebar.clearManualScript': '\uC218\uB3D9 \uC2A4\uD06C\uB9BD\uD2B8 \uD574\uC81C',
+  'sidebar.clearManualSubtitle': '\uC218\uB3D9 \uC790\uB9C9 \uD574\uC81C',
 
   'player.noVideo': '\uD3F4\uB354\uB97C \uC5F4\uAC70\uB098 \uB3D9\uC601\uC0C1 \uB610\uB294 \uC624\uB514\uC624 \uD30C\uC77C\uC744 \uB4DC\uB798\uADF8\uD558\uC5EC \uC2DC\uC791\uD558\uC138\uC694',
   'player.audioMode': '\uC624\uB514\uC624 \uC7AC\uC0DD',

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { FolderOpen, Film, FileCheck, Search, RefreshCw, Wifi, WifiOff, Folder, ChevronDown, ChevronRight, Clock, X, Zap, Music4 } from 'lucide-react'
+import { FolderOpen, Film, FileCheck, Search, RefreshCw, Wifi, WifiOff, Folder, ChevronDown, ChevronRight, Clock, X, Zap, Music4, Captions } from 'lucide-react'
 import { VideoFile } from '../types'
 import { useTranslation } from '../i18n'
 import EroScriptsPanel from './EroScriptsPanel'
@@ -46,10 +46,22 @@ interface SidebarProps {
   currentFile: string | null
   onFileSelect: (file: VideoFile) => void
   onOpenFolder: () => void
+  onManualScriptSelect: (file: VideoFile) => void | Promise<void>
+  onManualSubtitleSelect: (file: VideoFile) => void | Promise<void>
+  onClearManualScript: (file: VideoFile) => void | Promise<void>
+  onClearManualSubtitle: (file: VideoFile) => void | Promise<void>
+  manualScriptPaths: Set<string>
+  manualSubtitlePaths: Set<string>
   handyConnected: boolean
   onHandyConnect: (key: string) => void
   onHandyDisconnect: () => void
   scriptFolder?: string
+}
+
+interface FileContextMenuState {
+  file: VideoFile
+  x: number
+  y: number
 }
 
 interface FolderGroup {
@@ -79,6 +91,12 @@ export default function Sidebar({
   currentFile,
   onFileSelect,
   onOpenFolder,
+  onManualScriptSelect,
+  onManualSubtitleSelect,
+  onClearManualScript,
+  onClearManualSubtitle,
+  manualScriptPaths,
+  manualSubtitlePaths,
   handyConnected,
   onHandyConnect,
   onHandyDisconnect,
@@ -92,6 +110,7 @@ export default function Sidebar({
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set())
   const [handyHistory, setHandyHistory] = useState<HandyHistoryEntry[]>(loadHandyHistory)
   const [autoConnect, setAutoConnectState] = useState(getAutoConnect)
+  const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null)
 
   const filteredFiles = files.filter((f) =>
     (f.relativePath || f.name).toLowerCase().includes(filter.toLowerCase())
@@ -141,30 +160,56 @@ export default function Sidebar({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!contextMenu) return
+
+    const closeMenu = () => setContextMenu(null)
+    window.addEventListener('click', closeMenu)
+    window.addEventListener('scroll', closeMenu, true)
+    window.addEventListener('blur', closeMenu)
+
+    return () => {
+      window.removeEventListener('click', closeMenu)
+      window.removeEventListener('scroll', closeMenu, true)
+      window.removeEventListener('blur', closeMenu)
+    }
+  }, [contextMenu])
+
   const tabs = [
     { id: 'files' as const, icon: Film, label: t('sidebar.files') },
     { id: 'search' as const, icon: Search, label: t('sidebar.scripts') },
     { id: 'device' as const, icon: handyConnected ? Wifi : WifiOff, label: t('sidebar.device') },
   ]
 
+  const handleFileContextMenu = (event: React.MouseEvent<HTMLButtonElement>, file: VideoFile) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setContextMenu({
+      file,
+      x: event.clientX,
+      y: event.clientY,
+    })
+  }
+
   const renderFileItem = (file: VideoFile) => (
     <button
       key={file.path}
       onClick={() => onFileSelect(file)}
+      onContextMenu={(event) => handleFileContextMenu(event, file)}
       className={`w-full text-left px-3 py-2 rounded-md text-xs flex items-start gap-2 transition-colors mb-0.5 ${
         currentFile === file.path
           ? 'bg-accent/15 text-accent'
           : 'text-text-secondary hover:bg-surface-100/30 hover:text-text-primary'
       }`}
     >
-      {file.hasScript ? (
-        <FileCheck size={14} className="flex-shrink-0 mt-0.5 text-green-400" />
-      ) : (
-        file.type === 'audio'
-          ? <Music4 size={14} className="flex-shrink-0 mt-0.5" />
-          : <Film size={14} className="flex-shrink-0 mt-0.5" />
-      )}
-      <span className="break-all leading-relaxed">{file.name}</span>
+      {file.type === 'audio'
+        ? <Music4 size={14} className="flex-shrink-0 mt-0.5" />
+        : <Film size={14} className="flex-shrink-0 mt-0.5" />}
+      <span className="break-all leading-relaxed flex-1 min-w-0">{file.name}</span>
+      <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+        {file.hasSubtitles && <Captions size={14} className="text-sky-400" />}
+        {file.hasScript && <FileCheck size={14} className="text-green-400" />}
+      </div>
     </button>
   )
 
@@ -351,6 +396,57 @@ export default function Sidebar({
           </div>
         )}
       </div>
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-48 overflow-hidden rounded-lg border border-surface-100/40 bg-surface-200 shadow-2xl"
+          style={{
+            left: Math.min(contextMenu.x, window.innerWidth - 220),
+            top: Math.min(contextMenu.y, window.innerHeight - 180),
+          }}
+        >
+          <button
+            onClick={() => {
+              setContextMenu(null)
+              onManualScriptSelect(contextMenu.file)
+            }}
+            className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-100/30 hover:text-text-primary transition-colors"
+          >
+            {t('sidebar.selectScript')}
+          </button>
+          <button
+            onClick={() => {
+              setContextMenu(null)
+              onManualSubtitleSelect(contextMenu.file)
+            }}
+            className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-100/30 hover:text-text-primary transition-colors"
+          >
+            {t('sidebar.selectSubtitle')}
+          </button>
+          {manualScriptPaths.has(contextMenu.file.path) && (
+            <button
+              onClick={() => {
+                setContextMenu(null)
+                onClearManualScript(contextMenu.file)
+              }}
+              className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-100/30 hover:text-text-primary transition-colors"
+            >
+              {t('sidebar.clearManualScript')}
+            </button>
+          )}
+          {manualSubtitlePaths.has(contextMenu.file.path) && (
+            <button
+              onClick={() => {
+                setContextMenu(null)
+                onClearManualSubtitle(contextMenu.file)
+              }}
+              className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-100/30 hover:text-text-primary transition-colors"
+            >
+              {t('sidebar.clearManualSubtitle')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

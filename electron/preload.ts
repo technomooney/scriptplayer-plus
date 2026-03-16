@@ -11,14 +11,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Dialogs
   openVideo: () => ipcRenderer.invoke('dialog:openVideo'),
   openFolder: () => ipcRenderer.invoke('dialog:openFolder'),
+  openScriptFile: () => ipcRenderer.invoke('dialog:openScriptFile'),
+  openSubtitleFile: () => ipcRenderer.invoke('dialog:openSubtitleFile'),
 
   // File system
   readDir: (path: string) => ipcRenderer.invoke('fs:readDir', path),
   readFunscript: (videoPath: string, scriptFolder?: string) => ipcRenderer.invoke('fs:readFunscript', videoPath, scriptFolder),
+  readFunscriptFile: (filePath: string) => ipcRenderer.invoke('fs:readFunscriptFile', filePath),
   saveFunscript: (videoPath: string, data: string) => ipcRenderer.invoke('fs:saveFunscript', videoPath, data),
   getVideoUrl: (filePath: string) => ipcRenderer.invoke('fs:getVideoUrl', filePath),
   findArtwork: (mediaPath: string) => ipcRenderer.invoke('fs:findArtwork', mediaPath),
   readSubtitles: (mediaPath: string) => ipcRenderer.invoke('fs:readSubtitles', mediaPath),
+  readSubtitleFile: (filePath: string) => ipcRenderer.invoke('fs:readSubtitleFile', filePath),
 
   // NAS operations
   nasWebdavConnect: (url: string, username: string, password: string) =>
