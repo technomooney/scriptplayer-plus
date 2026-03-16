@@ -13,8 +13,6 @@ const ko: Record<string, string> = {
   'player.audioMode': '\uC624\uB514\uC624 \uC7AC\uC0DD',
   'player.fullscreen': '\uC804\uCCB4 \uD654\uBA74',
   'player.subtitles': '\uC790\uB9C9',
-  'player.keepAspectRatio': '\uC6D0\uBCF8 \uBE44\uC728 \uC720\uC9C0',
-  'player.fillScreen': '\uD654\uBA74 \uAC00\uB4DD \uCC44\uC6B0\uAE30',
 
   'eroscripts.search': 'EroScripts \uAC80\uC0C9...',
   'eroscripts.autoSearch': '\uD604\uC7AC \uB3D9\uC601\uC0C1 \uC790\uB3D9 \uAC80\uC0C9',

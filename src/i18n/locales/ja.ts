@@ -13,8 +13,6 @@ const ja: Record<string, string> = {
   'player.audioMode': '\u97F3\u58F0\u518D\u751F',
   'player.fullscreen': '\u30D5\u30EB\u30B9\u30AF\u30EA\u30FC\u30F3',
   'player.subtitles': '\u5B57\u5E55',
-  'player.keepAspectRatio': '\u5143\u306E\u7E26\u6A2A\u6BD4\u3092\u7DAD\u6301',
-  'player.fillScreen': '\u753B\u9762\u3044\u3063\u3071\u3044\u306B\u8868\u793A',
 
   'eroscripts.search': 'EroScripts\u3092\u691C\u7D22...',
   'eroscripts.autoSearch': '\u73FE\u5728\u306E\u52D5\u753B\u3092\u81EA\u52D5\u691C\u7D22',

@@ -13,8 +13,6 @@ const zh: Record<string, string> = {
   'player.audioMode': '\u97F3\u9891\u64AD\u653E',
   'player.fullscreen': '\u5168\u5C4F',
   'player.subtitles': '\u5B57\u5E55',
-  'player.keepAspectRatio': '\u4FDD\u6301\u539F\u59CB\u6BD4\u4F8B',
-  'player.fillScreen': '\u94FA\u6EE1\u5C4F\u5E55',
 
   'eroscripts.search': '\u641C\u7D22 EroScripts...',
   'eroscripts.autoSearch': '\u81EA\u52A8\u641C\u7D22\u5F53\u524D\u89C6\u9891',

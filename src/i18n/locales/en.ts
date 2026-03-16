@@ -13,8 +13,6 @@ const en: Record<string, string> = {
   'player.audioMode': 'Audio playback',
   'player.fullscreen': 'Fullscreen',
   'player.subtitles': 'Subtitles',
-  'player.keepAspectRatio': 'Keep aspect ratio',
-  'player.fillScreen': 'Fill screen',
 
   'eroscripts.search': 'Search EroScripts...',
   'eroscripts.autoSearch': 'Auto-search for current video',
