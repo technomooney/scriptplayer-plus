@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  集成 <b>The Handy</b> 设备、<b>EroScripts</b> 浏览器登录和多语言支持的现代 Funscript 视频播放器
+  集成 <b>The Handy</b> 设备、实验性 <b>Intiface / Buttplug</b> 支持、<b>EroScripts</b> 浏览器登录和多语言支持的现代 Funscript 视频播放器
 </p>
 
 <p align="center">
@@ -35,6 +35,16 @@
 | 设置 | macOS |
 |:-:|:-:|
 | ![设置](screenshots/setting.png) | ![macOS](screenshots/macos.png) |
+
+## 实验版 v0.1.5-exp.1
+
+`v0.1.5-exp.1` 预发布为 Intiface 已识别的兼容设备加入了实验性的 `Intiface / Buttplug` 多轴控制。FUNSR 系列 SR1 / SR6 / PRO 只要能被 Intiface 正确识别，也可以通过这一路径进行测试。
+
+| Intiface / Buttplug 实验设置 |
+|:-:|
+| ![Intiface / Buttplug 实验设置](screenshots/device_settings_v014.png) |
+
+- 下载预发布版本: [ScriptPlayer+ v0.1.5-exp.1](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 
 ## v0.1.4 新增内容
 
@@ -73,6 +83,7 @@
 
 1. 从 [Releases](https://github.com/sioaeko/scriptplayer-plus/releases) 下载最新的 `ScriptPlayerPlus-0.1.4-Windows-x64.zip`
 2. 解压后运行 `ScriptPlayerPlus.exe` — 无需安装
+3. Intiface 实验构建可从 [v0.1.5-exp.1 预发布](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1) 下载 `ScriptPlayerPlus-0.1.5-exp.1-Windows-x64.zip`
 
 ### macOS
 

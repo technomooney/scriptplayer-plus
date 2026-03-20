@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  <b>The Handy</b>連携、<b>EroScripts</b>ブラウザログイン、多言語対応のモダンなファンスクリプトビデオプレーヤー
+  <b>The Handy</b>連携、実験的な <b>Intiface / Buttplug</b> 対応、<b>EroScripts</b>ブラウザログイン、多言語対応のモダンなファンスクリプトビデオプレーヤー
 </p>
 
 <p align="center">
@@ -35,6 +35,16 @@
 | 設定 | macOS |
 |:-:|:-:|
 | ![設定](screenshots/setting.png) | ![macOS](screenshots/macos.png) |
+
+## 実験版 v0.1.5-exp.1
+
+`v0.1.5-exp.1` のプレリリースでは、Intiface が認識した互換デバイス向けに実験的な `Intiface / Buttplug` マルチアクシス制御を追加しています。FUNSR 系の SR1 / SR6 / PRO も、Intiface で正しく検出されればこの経路でテストできます。
+
+| Intiface / Buttplug 実験設定 |
+|:-:|
+| ![Intiface / Buttplug 実験設定](screenshots/device_settings_v014.png) |
+
+- プレリリースのダウンロード: [ScriptPlayer+ v0.1.5-exp.1](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 
 ## v0.1.4 の追加内容
 
@@ -73,6 +83,7 @@
 
 1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新の `ScriptPlayerPlus-0.1.4-Windows-x64.zip` をダウンロード
 2. 解凍して`ScriptPlayerPlus.exe`を実行 — インストール不要
+3. Intiface 実験ビルドは [v0.1.5-exp.1 プレリリース](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1) から `ScriptPlayerPlus-0.1.5-exp.1-Windows-x64.zip` をダウンロード
 
 ### macOS
 

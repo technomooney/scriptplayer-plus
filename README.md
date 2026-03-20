@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  A modern funscript video player with <b>The Handy</b> integration, <b>EroScripts</b> browser login, and multi-language support.
+  A modern funscript video player with <b>The Handy</b> integration, experimental <b>Intiface / Buttplug</b> support, <b>EroScripts</b> browser login, and multi-language support.
 </p>
 
 <p align="center">
@@ -35,6 +35,16 @@
 | Settings | macOS |
 |:-:|:-:|
 | ![Settings](docs/screenshots/setting.png) | ![macOS](docs/screenshots/macos.png) |
+
+## Experimental v0.1.5-exp.1
+
+The `v0.1.5-exp.1` prerelease adds experimental `Intiface / Buttplug` multi-axis support for compatible devices exposed by Intiface. This includes FUNSR-style SR1 / SR6 / PRO setups when they are detected correctly by Intiface.
+
+| Experimental Intiface Device Settings |
+|:-:|
+| ![Experimental Intiface Device Settings](docs/screenshots/device_settings_v014.png) |
+
+- Download the prerelease: [ScriptPlayer+ v0.1.5-exp.1](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 
 ## What's New In v0.1.4
 
@@ -73,6 +83,7 @@
 
 1. Download the latest `ScriptPlayerPlus-0.1.4-Windows-x64.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and run `ScriptPlayerPlus.exe` — no installation required
+3. For the experimental Intiface build, download `ScriptPlayerPlus-0.1.5-exp.1-Windows-x64.zip` from [the v0.1.5-exp.1 prerelease](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 
 ### macOS
 
