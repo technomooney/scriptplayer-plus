@@ -1,8 +1,12 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { FolderOpen, Film, FileCheck, Search, RefreshCw, Wifi, WifiOff, Folder, ChevronDown, ChevronRight, Clock, X, Zap, Music4, Captions } from 'lucide-react'
-import { VideoFile } from '../types'
+import { ScriptAxisId, VideoFile } from '../types'
+import { ButtplugDevice, ButtplugFeature } from '../services/buttplug'
+import { getScriptAxisDefinition } from '../services/multiaxis'
 import { useTranslation } from '../i18n'
 import EroScriptsPanel from './EroScriptsPanel'
+
+type DeviceProvider = 'handy' | 'buttplug'
 
 interface HandyHistoryEntry {
   key: string
@@ -52,9 +56,27 @@ interface SidebarProps {
   onClearManualSubtitle: (file: VideoFile) => void | Promise<void>
   manualScriptPaths: Set<string>
   manualSubtitlePaths: Set<string>
+  deviceProvider: DeviceProvider
+  onDeviceProviderChange: (provider: DeviceProvider) => void
   handyConnected: boolean
-  onHandyConnect: (key: string) => void
-  onHandyDisconnect: () => void
+  onHandyConnect: (key: string) => void | Promise<void>
+  onHandyDisconnect: () => void | Promise<void>
+  buttplugConnected: boolean
+  buttplugConnecting: boolean
+  buttplugDevices: ButtplugDevice[]
+  buttplugServerUrl: string
+  onButtplugServerUrlChange: (url: string) => void
+  onButtplugConnect: (url: string) => void | Promise<void>
+  onButtplugDisconnect: () => void | Promise<void>
+  buttplugScanning: boolean
+  onButtplugScan: () => void | Promise<void>
+  selectedButtplugDeviceIndex: number | null
+  onButtplugDeviceSelect: (deviceIndex: number | null) => void
+  buttplugError?: string | null
+  buttplugFeatures: ButtplugFeature[]
+  buttplugFeatureMappings: Record<string, { axisId: ScriptAxisId | ''; invert: boolean }>
+  onButtplugFeatureMappingChange: (featureId: string, next: { axisId: ScriptAxisId | ''; invert: boolean }) => void
+  buttplugAvailableAxes: ScriptAxisId[]
   scriptFolder?: string
 }
 
@@ -97,9 +119,27 @@ export default function Sidebar({
   onClearManualSubtitle,
   manualScriptPaths,
   manualSubtitlePaths,
+  deviceProvider,
+  onDeviceProviderChange,
   handyConnected,
   onHandyConnect,
   onHandyDisconnect,
+  buttplugConnected,
+  buttplugConnecting,
+  buttplugDevices,
+  buttplugServerUrl,
+  onButtplugServerUrlChange,
+  onButtplugConnect,
+  onButtplugDisconnect,
+  buttplugScanning,
+  onButtplugScan,
+  selectedButtplugDeviceIndex,
+  onButtplugDeviceSelect,
+  buttplugError,
+  buttplugFeatures,
+  buttplugFeatureMappings,
+  onButtplugFeatureMappingChange,
+  buttplugAvailableAxes,
   scriptFolder,
 }: SidebarProps) {
   const { t } = useTranslation()
@@ -111,6 +151,7 @@ export default function Sidebar({
   const [handyHistory, setHandyHistory] = useState<HandyHistoryEntry[]>(loadHandyHistory)
   const [autoConnect, setAutoConnectState] = useState(getAutoConnect)
   const [contextMenu, setContextMenu] = useState<FileContextMenuState | null>(null)
+  const autoConnectAttempted = useRef(false)
 
   const filteredFiles = files.filter((f) =>
     (f.relativePath || f.name).toLowerCase().includes(filter.toLowerCase())
@@ -118,6 +159,18 @@ export default function Sidebar({
 
   const folderGroups = useMemo(() => groupByFolder(filteredFiles), [filteredFiles])
   const hasSubfolders = folderGroups.length > 1 || (folderGroups.length === 1 && folderGroups[0].folder !== '')
+  const activeDeviceConnected = deviceProvider === 'handy' ? handyConnected : buttplugConnected
+  const selectedButtplugDevice = useMemo(
+    () => buttplugDevices.find((device) => device.index === selectedButtplugDeviceIndex) ?? null,
+    [buttplugDevices, selectedButtplugDeviceIndex]
+  )
+  const availableAxisOptions = useMemo(
+    () => buttplugAvailableAxes.map((axisId) => ({
+      id: axisId,
+      label: `${axisId} ${getScriptAxisDefinition(axisId).description}`,
+    })),
+    [buttplugAvailableAxes]
+  )
 
   const toggleFolder = (folder: string) => {
     setCollapsedFolders((prev) => {
@@ -131,13 +184,16 @@ export default function Sidebar({
   const handleConnect = async (key?: string) => {
     const k = (key || handyKey).trim()
     if (!k) return
-    setConnecting(true)
-    setHandyKey(k)
-    localStorage.setItem('handyKey', k)
-    await onHandyConnect(k)
-    setConnecting(false)
-    const updated = addToHandyHistory(k)
-    setHandyHistory(updated)
+    try {
+      setConnecting(true)
+      setHandyKey(k)
+      localStorage.setItem('handyKey', k)
+      await onHandyConnect(k)
+      const updated = addToHandyHistory(k)
+      setHandyHistory(updated)
+    } finally {
+      setConnecting(false)
+    }
   }
 
   const handleRemoveHistory = (key: string) => {
@@ -152,13 +208,26 @@ export default function Sidebar({
     setAutoConnect(next)
   }
 
-  // Auto-connect on mount
   useEffect(() => {
-    if (autoConnect && !handyConnected && handyHistory.length > 0) {
-      const lastKey = handyHistory[0].key
-      handleConnect(lastKey)
+    if (deviceProvider !== 'handy') {
+      autoConnectAttempted.current = false
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deviceProvider])
+
+  useEffect(() => {
+    if (
+      deviceProvider !== 'handy'
+      || !autoConnect
+      || handyConnected
+      || handyHistory.length === 0
+      || autoConnectAttempted.current
+    ) {
+      return
+    }
+
+    autoConnectAttempted.current = true
+    void handleConnect(handyHistory[0].key)
+  }, [autoConnect, deviceProvider, handyConnected, handyHistory]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!contextMenu) return
@@ -178,7 +247,7 @@ export default function Sidebar({
   const tabs = [
     { id: 'files' as const, icon: Film, label: t('sidebar.files') },
     { id: 'search' as const, icon: Search, label: t('sidebar.scripts') },
-    { id: 'device' as const, icon: handyConnected ? Wifi : WifiOff, label: t('sidebar.device') },
+    { id: 'device' as const, icon: activeDeviceConnected ? Wifi : WifiOff, label: t('sidebar.device') },
   ]
 
   const handleFileContextMenu = (event: React.MouseEvent<HTMLButtonElement>, file: VideoFile) => {
@@ -300,99 +369,267 @@ export default function Sidebar({
         {tab === 'device' && (
           <div className="p-3 space-y-4">
             <div>
-              <h3 className="text-xs font-medium text-text-primary mb-2">{t('device.theHandy')}</h3>
-              <div className="flex items-center gap-2 mb-3">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    handyConnected ? 'bg-green-400' : 'bg-text-muted'
-                  }`}
-                />
-                <span className="text-xs text-text-secondary">
-                  {handyConnected ? t('device.connected') : t('device.disconnected')}
-                </span>
-              </div>
-            </div>
-            <div>
               <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1.5">
-                {t('device.connectionKey')}
+                {t('device.provider')}
               </label>
-              <input
-                type="text"
-                placeholder={t('device.enterKey')}
-                value={handyKey}
-                onChange={(e) => setHandyKey(e.target.value)}
-                className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none placeholder:text-text-muted font-mono"
-              />
+              <select
+                value={deviceProvider}
+                onChange={(event) => onDeviceProviderChange(event.target.value as DeviceProvider)}
+                className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none"
+              >
+                <option value="handy">{t('device.providerHandy')}</option>
+                <option value="buttplug">{t('device.providerIntiface')}</option>
+              </select>
             </div>
-            {handyConnected ? (
-              <button
-                onClick={onHandyDisconnect}
-                className="w-full py-2 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors"
-              >
-                {t('device.disconnect')}
-              </button>
-            ) : (
-              <button
-                onClick={() => handleConnect()}
-                disabled={connecting || !handyKey.trim()}
-                className="w-full py-2 text-xs bg-accent/10 text-accent hover:bg-accent/20 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {connecting ? (
-                  <>
-                    <RefreshCw size={12} className="animate-spin" />
-                    {t('device.connecting')}
-                  </>
-                ) : (
-                  t('device.connect')
-                )}
-              </button>
-            )}
 
-            {/* Auto-connect toggle */}
-            <button
-              onClick={handleAutoConnectToggle}
-              className={`w-full py-2 text-xs rounded transition-colors flex items-center justify-center gap-2 ${
-                autoConnect
-                  ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
-                  : 'bg-surface-100/20 text-text-muted hover:bg-surface-100/30'
-              }`}
-            >
-              <Zap size={12} />
-              {autoConnect ? t('device.autoConnectOn') : t('device.autoConnectOff')}
-            </button>
-
-            {/* Recent connections */}
-            {handyHistory.length > 0 && !handyConnected && (
-              <div>
-                <label className="text-[10px] text-text-muted uppercase tracking-wider flex items-center gap-1 mb-1.5">
-                  <Clock size={10} />
-                  {t('device.recentKeys')}
-                </label>
-                <div className="space-y-1">
-                  {handyHistory.map((entry) => (
-                    <div key={entry.key} className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleConnect(entry.key)}
-                        disabled={connecting}
-                        className="flex-1 text-left px-2 py-1.5 text-xs font-mono text-text-secondary bg-surface-300 hover:bg-surface-100/30 rounded transition-colors truncate disabled:opacity-40"
-                      >
-                        {entry.key}
-                      </button>
-                      <button
-                        onClick={() => handleRemoveHistory(entry.key)}
-                        className="p-1 text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
+            {deviceProvider === 'handy' ? (
+              <>
+                <div>
+                  <h3 className="text-xs font-medium text-text-primary mb-2">{t('device.theHandy')}</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        handyConnected ? 'bg-green-400' : 'bg-text-muted'
+                      }`}
+                    />
+                    <span className="text-xs text-text-secondary">
+                      {handyConnected ? t('device.connected') : t('device.disconnected')}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+                <div>
+                  <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1.5">
+                    {t('device.connectionKey')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={t('device.enterKey')}
+                    value={handyKey}
+                    onChange={(e) => setHandyKey(e.target.value)}
+                    className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none placeholder:text-text-muted font-mono"
+                  />
+                </div>
+                {handyConnected ? (
+                  <button
+                    onClick={onHandyDisconnect}
+                    className="w-full py-2 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors"
+                  >
+                    {t('device.disconnect')}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleConnect()}
+                    disabled={connecting || !handyKey.trim()}
+                    className="w-full py-2 text-xs bg-accent/10 text-accent hover:bg-accent/20 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {connecting ? (
+                      <>
+                        <RefreshCw size={12} className="animate-spin" />
+                        {t('device.connecting')}
+                      </>
+                    ) : (
+                      t('device.connect')
+                    )}
+                  </button>
+                )}
 
-            <p className="text-[10px] text-text-muted leading-relaxed">
-              {t('device.getKey')}
-            </p>
+                <button
+                  onClick={handleAutoConnectToggle}
+                  className={`w-full py-2 text-xs rounded transition-colors flex items-center justify-center gap-2 ${
+                    autoConnect
+                      ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                      : 'bg-surface-100/20 text-text-muted hover:bg-surface-100/30'
+                  }`}
+                >
+                  <Zap size={12} />
+                  {autoConnect ? t('device.autoConnectOn') : t('device.autoConnectOff')}
+                </button>
+
+                {handyHistory.length > 0 && !handyConnected && (
+                  <div>
+                    <label className="text-[10px] text-text-muted uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                      <Clock size={10} />
+                      {t('device.recentKeys')}
+                    </label>
+                    <div className="space-y-1">
+                      {handyHistory.map((entry) => (
+                        <div key={entry.key} className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleConnect(entry.key)}
+                            disabled={connecting}
+                            className="flex-1 text-left px-2 py-1.5 text-xs font-mono text-text-secondary bg-surface-300 hover:bg-surface-100/30 rounded transition-colors truncate disabled:opacity-40"
+                          >
+                            {entry.key}
+                          </button>
+                          <button
+                            onClick={() => handleRemoveHistory(entry.key)}
+                            className="p-1 text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  {t('device.getKey')}
+                </p>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-xs font-medium text-text-primary mb-2">{t('device.intiface')}</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        buttplugConnected ? 'bg-green-400' : 'bg-text-muted'
+                      }`}
+                    />
+                    <span className="text-xs text-text-secondary">
+                      {buttplugConnected ? t('device.connected') : t('device.disconnected')}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1.5">
+                    {t('device.intifaceServer')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={t('device.enterIntifaceServer')}
+                    value={buttplugServerUrl}
+                    onChange={(event) => onButtplugServerUrlChange(event.target.value)}
+                    className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none placeholder:text-text-muted font-mono"
+                  />
+                </div>
+                {buttplugConnected ? (
+                  <button
+                    onClick={onButtplugDisconnect}
+                    className="w-full py-2 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors"
+                  >
+                    {t('device.disconnect')}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onButtplugConnect(buttplugServerUrl)}
+                    disabled={buttplugConnecting || !buttplugServerUrl.trim()}
+                    className="w-full py-2 text-xs bg-accent/10 text-accent hover:bg-accent/20 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {buttplugConnecting ? (
+                      <>
+                        <RefreshCw size={12} className="animate-spin" />
+                        {t('device.connecting')}
+                      </>
+                    ) : (
+                      t('device.connect')
+                    )}
+                  </button>
+                )}
+
+                <button
+                  onClick={onButtplugScan}
+                  disabled={!buttplugConnected || buttplugScanning}
+                  className="w-full py-2 text-xs bg-surface-100/20 text-text-secondary hover:bg-surface-100/30 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {buttplugScanning ? (
+                    <>
+                      <RefreshCw size={12} className="animate-spin" />
+                      {t('device.scanning')}
+                    </>
+                  ) : (
+                    t('device.scan')
+                  )}
+                </button>
+
+                <div>
+                  <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1.5">
+                    {t('device.linearDevice')}
+                  </label>
+                  <select
+                    value={selectedButtplugDevice ? selectedButtplugDevice.index.toString() : ''}
+                    onChange={(event) => onButtplugDeviceSelect(event.target.value ? Number(event.target.value) : null)}
+                    disabled={!buttplugConnected || buttplugDevices.length === 0}
+                    className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none disabled:opacity-40"
+                  >
+                    {buttplugDevices.length === 0 ? (
+                      <option value="">{t('device.noLinearDevices')}</option>
+                    ) : (
+                      buttplugDevices.map((device) => (
+                        <option key={device.index} value={device.index}>
+                          {`${device.displayName} (${device.features.length})`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                {selectedButtplugDevice && (
+                  <p className="text-[10px] text-text-muted leading-relaxed">
+                    {selectedButtplugDevice.features.map((feature) => feature.descriptor).join(', ')}
+                  </p>
+                )}
+
+                {selectedButtplugDevice && buttplugFeatures.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-text-muted uppercase tracking-wider block">
+                      {t('device.axisMapping')}
+                    </label>
+                    {buttplugFeatures.map((feature) => {
+                      const mapping = buttplugFeatureMappings[feature.id] || { axisId: '', invert: false }
+                      return (
+                        <div key={feature.id} className="rounded border border-surface-100/30 bg-surface-300/60 p-2 space-y-2">
+                          <div className="text-[10px] text-text-secondary">
+                            {feature.descriptor}
+                          </div>
+                          <div className="flex gap-2">
+                            <select
+                              value={mapping.axisId}
+                              onChange={(event) => onButtplugFeatureMappingChange(feature.id, {
+                                ...mapping,
+                                axisId: event.target.value as ScriptAxisId | '',
+                              })}
+                              className="flex-1 bg-surface-300 text-text-primary text-xs px-2 py-1.5 rounded border border-surface-100/30 focus:border-accent/50 outline-none"
+                            >
+                              <option value="">{t('device.unmapped')}</option>
+                              {availableAxisOptions.map((axis) => (
+                                <option key={axis.id} value={axis.id}>
+                                  {axis.label}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => onButtplugFeatureMappingChange(feature.id, {
+                                ...mapping,
+                                invert: !mapping.invert,
+                              })}
+                              className={`px-2 py-1.5 rounded text-[10px] transition-colors ${
+                                mapping.invert
+                                  ? 'bg-accent/15 text-accent'
+                                  : 'bg-surface-100/20 text-text-muted hover:bg-surface-100/30'
+                              }`}
+                            >
+                              {t('device.invertAxis')}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {buttplugError && (
+                  <p className="text-[10px] text-red-400 leading-relaxed">
+                    {buttplugError}
+                  </p>
+                )}
+
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  {t('device.intifaceHint')}
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

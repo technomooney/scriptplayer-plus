@@ -23,6 +23,14 @@ export interface Funscript {
   }
 }
 
+export type ScriptAxisId = 'L0' | 'L1' | 'L2' | 'R0' | 'R1' | 'R2' | 'V0' | 'V1' | 'A0' | 'A1' | 'A2'
+
+export interface FunscriptBundle {
+  primaryAxis: ScriptAxisId | null
+  scripts: Partial<Record<ScriptAxisId, Funscript>>
+  sources: Partial<Record<ScriptAxisId, string>>
+}
+
 export type MediaType = 'video' | 'audio'
 export type PlaybackMode = 'none' | 'sequential' | 'shuffle'
 
@@ -73,6 +81,7 @@ declare global {
       getDroppedFilePath: (file: File) => string
       readDir: (path: string) => Promise<VideoFile[]>
       readFunscript: (videoPath: string, scriptFolder?: string) => Promise<Funscript | null>
+      readFunscriptBundle: (videoPath: string, scriptFolder?: string, preferredScriptPath?: string) => Promise<FunscriptBundle | null>
       readFunscriptFile: (filePath: string) => Promise<Funscript | null>
       saveFunscript: (videoPath: string, data: string) => Promise<boolean>
       getVideoUrl: (filePath: string) => Promise<string>

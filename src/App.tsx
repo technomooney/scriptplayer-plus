@@ -3,9 +3,31 @@ import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import VideoPlayer from './components/VideoPlayer'
 import Settings from './components/Settings'
-import { VideoFile, Funscript, FunscriptAction, MediaType, PlaybackMode, SubtitleCue, SubtitleFile } from './types'
-import { parseFunscript, transformFunscriptActions } from './services/funscript'
+import {
+  Funscript,
+  FunscriptAction,
+  FunscriptBundle,
+  MediaType,
+  PlaybackMode,
+  ScriptAxisId,
+  SubtitleCue,
+  SubtitleFile,
+  VideoFile,
+} from './types'
+import { getPositionAtTime, parseFunscript, transformFunscriptActions } from './services/funscript'
 import { handyService, HandyUploadStatus } from './services/handy'
+import {
+  ButtplugConnectionState,
+  ButtplugDevice,
+  ButtplugDeviceFrame,
+  ButtplugFeature,
+  buttplugService,
+} from './services/buttplug'
+import {
+  getDefaultAxisValue,
+  normalizeScriptBundle,
+  SCRIPT_AXIS_IDS,
+} from './services/multiaxis'
 import { AppSettings, loadSettings, saveSettings } from './services/settings'
 import { getVideoSubtitleMatchScore, parseSubtitleFile } from './services/subtitles'
 import { useTranslation } from './i18n'
@@ -14,6 +36,18 @@ const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.webm', '.mov', '.wmv']
 const AUDIO_EXTS = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wma']
 const PLAYBACK_MODE_STORAGE_KEY = 'scriptplayer-playback-mode'
 const PLAYBACK_RATE_STORAGE_KEY = 'scriptplayer-playback-rate'
+const DEVICE_PROVIDER_STORAGE_KEY = 'scriptplayer-device-provider'
+const BUTTPLUG_SERVER_URL_STORAGE_KEY = 'scriptplayer-buttplug-url'
+const BUTTPLUG_DEVICE_INDEX_STORAGE_KEY = 'scriptplayer-buttplug-device-index'
+const BUTTPLUG_FEATURE_MAPPINGS_STORAGE_KEY = 'scriptplayer-buttplug-feature-mappings-v1'
+const DEFAULT_BUTTPLUG_SERVER_URL = 'ws://127.0.0.1:12345'
+
+type DeviceProvider = 'handy' | 'buttplug'
+type AxisActionMap = Partial<Record<ScriptAxisId, FunscriptAction[]>>
+type StoredButtplugFeatureMapping = {
+  axisId: ScriptAxisId | ''
+  invert: boolean
+}
 
 function getMediaTypeFromPath(filePath: string): MediaType | null {
   const ext = '.' + (filePath.split('.').pop()?.toLowerCase() || '')
@@ -46,6 +80,49 @@ function loadPlaybackRate(): number {
   }
 
   return 1
+}
+
+function loadDeviceProvider(): DeviceProvider {
+  try {
+    const stored = localStorage.getItem(DEVICE_PROVIDER_STORAGE_KEY)
+    if (stored === 'handy' || stored === 'buttplug') {
+      return stored
+    }
+  } catch {
+    // Ignore storage failures
+  }
+
+  return 'handy'
+}
+
+function loadButtplugServerUrl(): string {
+  try {
+    return localStorage.getItem(BUTTPLUG_SERVER_URL_STORAGE_KEY) || DEFAULT_BUTTPLUG_SERVER_URL
+  } catch {
+    return DEFAULT_BUTTPLUG_SERVER_URL
+  }
+}
+
+function loadButtplugDeviceIndex(): number | null {
+  try {
+    const raw = localStorage.getItem(BUTTPLUG_DEVICE_INDEX_STORAGE_KEY)
+    if (raw === null) return null
+    const parsed = Number(raw)
+    return Number.isInteger(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function loadButtplugFeatureMappings(): Record<string, StoredButtplugFeatureMapping> {
+  try {
+    const raw = localStorage.getItem(BUTTPLUG_FEATURE_MAPPINGS_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
 }
 
 function getPlaybackTimeScale(playbackRate: number): number {
@@ -83,6 +160,205 @@ function getNextPlaybackFile(
   return candidates[Math.floor(Math.random() * candidates.length)] ?? null
 }
 
+function parseFunscriptBundleData(raw: unknown): FunscriptBundle | null {
+  const normalized = normalizeScriptBundle(raw)
+  if (!normalized) return null
+
+  const parsedScripts: Partial<Record<ScriptAxisId, Funscript>> = {}
+  for (const axisId of SCRIPT_AXIS_IDS) {
+    const script = normalized.scripts[axisId]
+    if (!script) continue
+    const parsed = parseFunscript(script)
+    if (parsed) {
+      parsedScripts[axisId] = parsed
+    }
+  }
+
+  const availableAxes = Object.keys(parsedScripts) as ScriptAxisId[]
+  if (availableAxes.length === 0) return null
+
+  const primaryAxis = normalized.primaryAxis && parsedScripts[normalized.primaryAxis]
+    ? normalized.primaryAxis
+    : (availableAxes.includes('L0') ? 'L0' : availableAxes[0])
+
+  return {
+    primaryAxis,
+    scripts: parsedScripts,
+    sources: normalized.sources,
+  }
+}
+
+function buildAxisActionMap(
+  scripts: Partial<Record<ScriptAxisId, Funscript>> | AxisActionMap | undefined,
+  transform: (axisId: ScriptAxisId, actions: FunscriptAction[]) => FunscriptAction[]
+): AxisActionMap {
+  const next: AxisActionMap = {}
+
+  if (!scripts) return next
+
+  for (const axisId of SCRIPT_AXIS_IDS) {
+    const source = scripts[axisId]
+    if (!source) continue
+    const actions = Array.isArray(source) ? source : source.actions
+    next[axisId] = transform(axisId, actions)
+  }
+
+  return next
+}
+
+function getPrimaryAxis(bundle: FunscriptBundle | null): ScriptAxisId | null {
+  if (!bundle) return null
+  if (bundle.primaryAxis && bundle.scripts[bundle.primaryAxis]) return bundle.primaryAxis
+  if (bundle.scripts.L0) return 'L0'
+  return (Object.keys(bundle.scripts)[0] as ScriptAxisId | undefined) ?? null
+}
+
+function buildButtplugDeviceSignature(device: ButtplugDevice): string {
+  const featureSignature = device.features
+    .map((feature) => `${feature.type}:${feature.index}:${feature.descriptor}:${feature.actuatorType || ''}`)
+    .join('|')
+
+  return `${device.name}|${device.displayName}|${featureSignature}`
+}
+
+function getButtplugFeatureStorageKey(deviceSignature: string, featureId: string): string {
+  return `${deviceSignature}::${featureId}`
+}
+
+function guessScriptAxisForFeature(feature: ButtplugFeature): ScriptAxisId | '' {
+  const text = `${feature.descriptor} ${feature.actuatorType || ''}`.toLowerCase()
+
+  if (feature.type === 'linear') {
+    if (text.includes('stroke') || text.includes('stroker') || text.includes('thrust')) return 'L0'
+    if (text.includes('surge') || text.includes('forward') || text.includes('back')) return 'L1'
+    if (text.includes('sway') || text.includes('left') || text.includes('right')) return 'L2'
+    if (feature.index === 0) return 'L0'
+    if (feature.index === 1) return 'L1'
+    if (feature.index === 2) return 'L2'
+  }
+
+  if (feature.type === 'rotate') {
+    if (text.includes('twist')) return 'R0'
+    if (text.includes('roll')) return 'R1'
+    if (text.includes('pitch')) return 'R2'
+    if (feature.index === 0) return 'R0'
+    if (feature.index === 1) return 'R1'
+    if (feature.index === 2) return 'R2'
+  }
+
+  if (feature.type === 'scalar') {
+    if (text.includes('vibe') || text.includes('vibrate')) return feature.index === 0 ? 'V0' : 'V1'
+    if (text.includes('pump')) return 'V1'
+    if (text.includes('valve')) return 'A0'
+    if (text.includes('suck') || text.includes('suction')) return 'A1'
+    if (text.includes('lube')) return 'A2'
+  }
+
+  return ''
+}
+
+function buildFeatureMappingsForDevice(
+  device: ButtplugDevice | null,
+  mappingStore: Record<string, StoredButtplugFeatureMapping>
+): Record<string, StoredButtplugFeatureMapping> {
+  if (!device) return {}
+
+  const deviceSignature = buildButtplugDeviceSignature(device)
+  const next: Record<string, StoredButtplugFeatureMapping> = {}
+
+  for (const feature of device.features) {
+    const key = getButtplugFeatureStorageKey(deviceSignature, feature.id)
+    const stored = mappingStore[key]
+    next[feature.id] = {
+      axisId: stored?.axisId ?? guessScriptAxisForFeature(feature),
+      invert: stored?.invert ?? false,
+    }
+  }
+
+  return next
+}
+
+function getAxisValueAtTime(axisId: ScriptAxisId, actionMap: AxisActionMap, timeMs: number): number {
+  const actions = actionMap[axisId]
+  if (!actions || actions.length === 0) {
+    return getDefaultAxisValue(axisId)
+  }
+
+  return getPositionAtTime(actions, timeMs) / 100
+}
+
+function applyAxisMappingValue(axisId: ScriptAxisId, value: number, invert: boolean): number {
+  const safeValue = Number.isFinite(value) ? value : getDefaultAxisValue(axisId)
+  return invert ? 1 - safeValue : safeValue
+}
+
+function buildButtplugFrame(
+  device: ButtplugDevice,
+  mappings: Record<string, StoredButtplugFeatureMapping>,
+  actionMap: AxisActionMap,
+  currentTimeMs: number,
+  targetTimeMs: number,
+  intervalMs: number
+): ButtplugDeviceFrame {
+  const frame: ButtplugDeviceFrame = {
+    linear: [],
+    rotate: [],
+    scalar: [],
+  }
+
+  for (const feature of device.features) {
+    const mapping = mappings[feature.id]
+    const mappedAxisId = mapping?.axisId
+
+    if (!mappedAxisId) {
+      if (feature.type === 'linear') {
+        frame.linear?.push({ index: feature.index, position: 0.5, duration: intervalMs })
+      } else if (feature.type === 'rotate') {
+        frame.rotate?.push({ index: feature.index, speed: 0, clockwise: true })
+      } else if (feature.type === 'scalar' && feature.actuatorType) {
+        frame.scalar?.push({ index: feature.index, scalar: 0, actuatorType: feature.actuatorType })
+      }
+      continue
+    }
+
+    const currentValue = applyAxisMappingValue(
+      mappedAxisId,
+      getAxisValueAtTime(mappedAxisId, actionMap, currentTimeMs),
+      mapping?.invert ?? false
+    )
+    const targetValue = applyAxisMappingValue(
+      mappedAxisId,
+      getAxisValueAtTime(mappedAxisId, actionMap, targetTimeMs),
+      mapping?.invert ?? false
+    )
+
+    if (feature.type === 'linear') {
+      frame.linear?.push({ index: feature.index, position: targetValue, duration: intervalMs })
+      continue
+    }
+
+    if (feature.type === 'rotate') {
+      const delta = targetValue - currentValue
+      frame.rotate?.push({
+        index: feature.index,
+        speed: Math.min(1, Math.abs(delta) * 1000 / Math.max(intervalMs, 1)),
+        clockwise: delta >= 0,
+      })
+      continue
+    }
+
+    if (feature.type === 'scalar' && feature.actuatorType) {
+      frame.scalar?.push({ index: feature.index, scalar: targetValue, actuatorType: feature.actuatorType })
+    }
+  }
+
+  return {
+    linear: frame.linear && frame.linear.length > 0 ? frame.linear : undefined,
+    rotate: frame.rotate && frame.rotate.length > 0 ? frame.rotate : undefined,
+    scalar: frame.scalar && frame.scalar.length > 0 ? frame.scalar : undefined,
+  }
+}
+
 export default function App() {
   const { locale, setLocale } = useTranslation()
   const [files, setFiles] = useState<VideoFile[]>([])
@@ -90,11 +366,19 @@ export default function App() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [currentFileType, setCurrentFileType] = useState<MediaType | null>(null)
   const [artworkUrl, setArtworkUrl] = useState<string | null>(null)
-  const [funscript, setFunscript] = useState<Funscript | null>(null)
+  const [funscriptBundle, setFunscriptBundle] = useState<FunscriptBundle | null>(null)
   const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([])
+  const [deviceProvider, setDeviceProvider] = useState<DeviceProvider>(loadDeviceProvider)
   const [handyConnected, setHandyConnected] = useState(false)
   const [scriptUploadUrl, setScriptUploadUrl] = useState<string | null>(null)
   const [handyUploadStatus, setHandyUploadStatus] = useState<HandyUploadStatus>('idle')
+  const [buttplugConnectionState, setButtplugConnectionState] = useState<ButtplugConnectionState>('disconnected')
+  const [buttplugError, setButtplugError] = useState<string | null>(null)
+  const [buttplugDevices, setButtplugDevices] = useState<ButtplugDevice[]>([])
+  const [buttplugScanning, setButtplugScanning] = useState(false)
+  const [buttplugServerUrl, setButtplugServerUrlState] = useState<string>(loadButtplugServerUrl)
+  const [selectedButtplugDeviceIndex, setSelectedButtplugDeviceIndexState] = useState<number | null>(loadButtplugDeviceIndex)
+  const [buttplugFeatureMappingStore, setButtplugFeatureMappingStore] = useState<Record<string, StoredButtplugFeatureMapping>>(loadButtplugFeatureMappings)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
   const [manualScriptPaths, setManualScriptPaths] = useState<Record<string, string>>({})
@@ -104,20 +388,42 @@ export default function App() {
   const [autoPlayRequestId, setAutoPlayRequestId] = useState(0)
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const handyUploadRequestId = useRef(0)
+  const buttplugStreamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const buttplugStreamRunId = useRef(0)
 
-  const actions: FunscriptAction[] = funscript?.actions || []
-  const displayActions = useMemo(
-    () =>
-      transformFunscriptActions(actions, {
-        strokeMin: settings.strokeRangeMin,
-        strokeMax: settings.strokeRangeMax,
-        invert: settings.invertStroke,
-      }),
-    [actions, settings.strokeRangeMin, settings.strokeRangeMax, settings.invertStroke]
+  const primaryAxis = useMemo(() => getPrimaryAxis(funscriptBundle), [funscriptBundle])
+  const displayAxisActions = useMemo(
+    () => buildAxisActionMap(
+      funscriptBundle?.scripts,
+      (axisId, actions) => transformFunscriptActions(actions, axisId === 'L0'
+        ? {
+            strokeMin: settings.strokeRangeMin,
+            strokeMax: settings.strokeRangeMax,
+            invert: settings.invertStroke,
+          }
+        : {})
+    ),
+    [funscriptBundle?.scripts, settings.invertStroke, settings.strokeRangeMax, settings.strokeRangeMin]
   )
-  const handyActions = useMemo(
-    () => transformFunscriptActions(displayActions, { timeScale: getPlaybackTimeScale(playbackRate) }),
-    [displayActions, playbackRate]
+  const runtimeAxisActions = useMemo(
+    () => buildAxisActionMap(displayAxisActions, (_axisId, actions) =>
+      transformFunscriptActions(actions, { timeScale: getPlaybackTimeScale(playbackRate) })
+    ),
+    [displayAxisActions, playbackRate]
+  )
+  const displayActions = useMemo(
+    () => (primaryAxis ? displayAxisActions[primaryAxis] ?? [] : []),
+    [displayAxisActions, primaryAxis]
+  )
+  const handyActions = useMemo(() => {
+    if (runtimeAxisActions.L0 && runtimeAxisActions.L0.length > 0) {
+      return runtimeAxisActions.L0
+    }
+    return primaryAxis ? runtimeAxisActions[primaryAxis] ?? [] : []
+  }, [primaryAxis, runtimeAxisActions])
+  const availableScriptAxes = useMemo(
+    () => SCRIPT_AXIS_IDS.filter((axisId) => Boolean(displayAxisActions[axisId]?.length)),
+    [displayAxisActions]
   )
   const displayFiles = useMemo(
     () => files.map((file) => ({
@@ -127,21 +433,49 @@ export default function App() {
     })),
     [files, manualScriptPaths, manualSubtitleFiles]
   )
+  const buttplugConnected = buttplugConnectionState === 'connected'
+  const selectedButtplugDevice = useMemo(
+    () => buttplugDevices.find((device) => device.index === selectedButtplugDeviceIndex) ?? null,
+    [buttplugDevices, selectedButtplugDeviceIndex]
+  )
+  const selectedButtplugFeatureMappings = useMemo(
+    () => buildFeatureMappingsForDevice(selectedButtplugDevice, buttplugFeatureMappingStore),
+    [buttplugFeatureMappingStore, selectedButtplugDevice]
+  )
 
-  // Listen for Handy upload status changes
   useEffect(() => {
     handyService.onStatusChange = (status) => {
       setHandyUploadStatus(status)
     }
-    return () => { handyService.onStatusChange = null }
+    return () => {
+      handyService.onStatusChange = null
+    }
   }, [])
 
-  // Sync settings language with i18n
+  useEffect(() => {
+    buttplugService.onConnectionChange = (state, error) => {
+      setButtplugConnectionState(state)
+      setButtplugError(error)
+    }
+    buttplugService.onDevicesChange = (devices) => {
+      setButtplugDevices(devices)
+    }
+    buttplugService.onScanChange = (scanning) => {
+      setButtplugScanning(scanning)
+    }
+
+    return () => {
+      buttplugService.onConnectionChange = null
+      buttplugService.onDevicesChange = null
+      buttplugService.onScanChange = null
+    }
+  }, [])
+
   useEffect(() => {
     if (settings.language !== locale) {
       setLocale(settings.language)
     }
-  }, [settings.language])
+  }, [locale, setLocale, settings.language])
 
   useEffect(() => {
     try {
@@ -159,10 +493,137 @@ export default function App() {
     }
   }, [playbackRate])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(DEVICE_PROVIDER_STORAGE_KEY, deviceProvider)
+    } catch {
+      // Ignore storage failures
+    }
+  }, [deviceProvider])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BUTTPLUG_FEATURE_MAPPINGS_STORAGE_KEY, JSON.stringify(buttplugFeatureMappingStore))
+    } catch {
+      // Ignore storage failures
+    }
+  }, [buttplugFeatureMappingStore])
+
   const handleSettingsChange = useCallback((newSettings: AppSettings) => {
     setSettings(newSettings)
     saveSettings(newSettings)
   }, [])
+
+  const setButtplugServerUrl = useCallback((url: string) => {
+    setButtplugServerUrlState(url)
+    try {
+      localStorage.setItem(BUTTPLUG_SERVER_URL_STORAGE_KEY, url)
+    } catch {
+      // Ignore storage failures
+    }
+  }, [])
+
+  const setSelectedButtplugDeviceIndex = useCallback((deviceIndex: number | null) => {
+    setSelectedButtplugDeviceIndexState(deviceIndex)
+    try {
+      if (deviceIndex === null) {
+        localStorage.removeItem(BUTTPLUG_DEVICE_INDEX_STORAGE_KEY)
+      } else {
+        localStorage.setItem(BUTTPLUG_DEVICE_INDEX_STORAGE_KEY, deviceIndex.toString())
+      }
+    } catch {
+      // Ignore storage failures
+    }
+  }, [])
+
+  const setSelectedButtplugFeatureMapping = useCallback((featureId: string, next: StoredButtplugFeatureMapping) => {
+    if (!selectedButtplugDevice) return
+    const deviceSignature = buildButtplugDeviceSignature(selectedButtplugDevice)
+    const storageKey = getButtplugFeatureStorageKey(deviceSignature, featureId)
+
+    setButtplugFeatureMappingStore((prev) => ({
+      ...prev,
+      [storageKey]: next,
+    }))
+  }, [selectedButtplugDevice])
+
+  const clearButtplugStreamTimer = useCallback(() => {
+    if (!buttplugStreamTimer.current) return
+    clearTimeout(buttplugStreamTimer.current)
+    buttplugStreamTimer.current = null
+  }, [])
+
+  const stopButtplugPlayback = useCallback(
+    async (options?: { stopDevice?: boolean }) => {
+      buttplugStreamRunId.current += 1
+      clearButtplugStreamTimer()
+
+      if (!options?.stopDevice || !buttplugService.isConnected) return
+
+      if (selectedButtplugDeviceIndex !== null) {
+        await buttplugService.stopDevice(selectedButtplugDeviceIndex)
+      } else {
+        await buttplugService.stopAllDevices()
+      }
+    },
+    [clearButtplugStreamTimer, selectedButtplugDeviceIndex]
+  )
+
+  const startButtplugPlayback = useCallback(async () => {
+    const media = mediaRef.current
+    if (
+      !media
+      || media.paused
+      || deviceProvider !== 'buttplug'
+      || !buttplugConnected
+      || !selectedButtplugDevice
+      || availableScriptAxes.length === 0
+    ) {
+      return
+    }
+
+    const runId = ++buttplugStreamRunId.current
+    clearButtplugStreamTimer()
+
+    const tick = async () => {
+      if (runId !== buttplugStreamRunId.current) return
+
+      const currentMedia = mediaRef.current
+      if (!currentMedia || currentMedia.paused) return
+
+      const intervalMs = buttplugService.getRecommendedCommandInterval(selectedButtplugDevice.index)
+      const effectivePlaybackRate = currentMedia.playbackRate > 0 ? currentMedia.playbackRate : playbackRate
+      const currentTimeMs = currentMedia.currentTime * 1000 + (settings.timeOffset || 0)
+      const targetTimeMs = currentTimeMs + intervalMs * effectivePlaybackRate
+      const frame = buildButtplugFrame(
+        selectedButtplugDevice,
+        selectedButtplugFeatureMappings,
+        runtimeAxisActions,
+        currentTimeMs,
+        targetTimeMs,
+        intervalMs
+      )
+
+      await buttplugService.sendDeviceFrame(selectedButtplugDevice.index, frame)
+
+      if (runId !== buttplugStreamRunId.current) return
+      buttplugStreamTimer.current = setTimeout(() => {
+        void tick()
+      }, intervalMs)
+    }
+
+    await tick()
+  }, [
+    availableScriptAxes.length,
+    buttplugConnected,
+    clearButtplugStreamTimer,
+    deviceProvider,
+    playbackRate,
+    runtimeAxisActions,
+    selectedButtplugDevice,
+    selectedButtplugFeatureMappings,
+    settings.timeOffset,
+  ])
 
   const loadSubtitleCues = useCallback(async (mediaPath: string, mediaType: MediaType) => {
     const manualSubtitle = manualSubtitleFiles[mediaPath]
@@ -174,17 +635,11 @@ export default function App() {
     return selectSubtitleCues(mediaPath, mediaType, subtitleFiles)
   }, [manualSubtitleFiles])
 
-  const loadScript = useCallback(async (mediaPath: string) => {
+  const loadScriptBundle = useCallback(async (mediaPath: string) => {
     const manualScriptPath = manualScriptPaths[mediaPath]
-    if (manualScriptPath) {
-      const manualScript = await window.electronAPI.readFunscriptFile(manualScriptPath)
-      return manualScript ? parseFunscript(manualScript) : null
-    }
-
-    const script = await window.electronAPI.readFunscript(mediaPath, settings.scriptFolder)
-    return script ? parseFunscript(script) : null
+    const rawBundle = await window.electronAPI.readFunscriptBundle(mediaPath, settings.scriptFolder, manualScriptPath)
+    return parseFunscriptBundleData(rawBundle)
   }, [manualScriptPaths, settings.scriptFolder])
-
 
   const handleOpenFolder = useCallback(async () => {
     const folderPath = await window.electronAPI.openFolder()
@@ -205,6 +660,10 @@ export default function App() {
       await handyService.hsspStop()
     }
 
+    if (buttplugService.isConnected) {
+      await stopButtplugPlayback({ stopDevice: true })
+    }
+
     const currentMedia = mediaRef.current
     if (currentMedia && !currentMedia.paused) {
       currentMedia.pause()
@@ -216,16 +675,15 @@ export default function App() {
 
     setCurrentFile(filePath)
     setCurrentFileType(resolvedType)
-    setFunscript(null)
+    setFunscriptBundle(null)
     setSubtitleCues([])
     setScriptUploadUrl(null)
-
     setArtworkUrl(null)
 
-    const [url, nextSubtitleCues, parsed, artworkPath] = await Promise.all([
+    const [url, nextSubtitleCues, parsedBundle, artworkPath] = await Promise.all([
       window.electronAPI.getVideoUrl(filePath),
       loadSubtitleCues(filePath, resolvedType),
-      loadScript(filePath),
+      loadScriptBundle(filePath),
       resolvedType === 'audio'
         ? window.electronAPI.findArtwork(filePath)
         : Promise.resolve<string | null>(null),
@@ -233,13 +691,13 @@ export default function App() {
 
     setVideoUrl(url)
     setSubtitleCues(nextSubtitleCues)
-    setFunscript(parsed)
+    setFunscriptBundle(parsedBundle)
 
     if (artworkPath) {
       const nextArtworkUrl = await window.electronAPI.getVideoUrl(artworkPath)
       setArtworkUrl(nextArtworkUrl)
     }
-  }, [loadScript, loadSubtitleCues])
+  }, [loadScriptBundle, loadSubtitleCues, stopButtplugPlayback])
 
   const handleFileSelect = useCallback(async (file: VideoFile) => {
     await openMediaFile(file.path, file.type)
@@ -252,11 +710,10 @@ export default function App() {
     setManualScriptPaths((prev) => ({ ...prev, [file.path]: scriptPath }))
 
     if (currentFile === file.path) {
-      const parsed = await window.electronAPI.readFunscriptFile(scriptPath)
-      const nextScript = parsed ? parseFunscript(parsed) : null
-      setFunscript(nextScript)
+      const rawBundle = await window.electronAPI.readFunscriptBundle(file.path, settings.scriptFolder, scriptPath)
+      setFunscriptBundle(parseFunscriptBundleData(rawBundle))
     }
-  }, [currentFile])
+  }, [currentFile, settings.scriptFolder])
 
   const handleManualSubtitleSelect = useCallback(async (file: VideoFile) => {
     const subtitlePath = await window.electronAPI.openSubtitleFile()
@@ -282,9 +739,8 @@ export default function App() {
     })
 
     if (currentFile === file.path) {
-      const script = await window.electronAPI.readFunscript(file.path, settings.scriptFolder)
-      const parsed = script ? parseFunscript(script) : null
-      setFunscript(parsed)
+      const rawBundle = await window.electronAPI.readFunscriptBundle(file.path, settings.scriptFolder)
+      setFunscriptBundle(parseFunscriptBundleData(rawBundle))
     }
   }, [currentFile, settings.scriptFolder])
 
@@ -313,6 +769,22 @@ export default function App() {
     setScriptUploadUrl(null)
   }
 
+  const handleButtplugConnect = async (url: string) => {
+    const trimmedUrl = url.trim()
+    setButtplugServerUrl(trimmedUrl)
+    await buttplugService.connect(trimmedUrl)
+  }
+
+  const handleButtplugDisconnect = async () => {
+    await stopButtplugPlayback({ stopDevice: true })
+    await buttplugService.disconnect()
+  }
+
+  const handleButtplugScan = async () => {
+    await buttplugService.startScanning()
+    await buttplugService.refreshDevices()
+  }
+
   const syncHandyPlayback = useCallback(async (mediaTimeSeconds: number) => {
     if (!handyService.isConnected || !scriptUploadUrl) return
     const startTime = getHandyStartTime(mediaTimeSeconds, playbackRate, settings.timeOffset || 0)
@@ -322,26 +794,46 @@ export default function App() {
   const handlePlay = useCallback(async () => {
     const media = mediaRef.current
     if (!media) return
-    await syncHandyPlayback(media.currentTime)
-  }, [syncHandyPlayback])
+    if (deviceProvider === 'handy') {
+      await syncHandyPlayback(media.currentTime)
+      return
+    }
+
+    if (deviceProvider === 'buttplug') {
+      await startButtplugPlayback()
+    }
+  }, [deviceProvider, startButtplugPlayback, syncHandyPlayback])
 
   const handlePause = useCallback(async () => {
-    if (handyService.isConnected) {
+    if (deviceProvider === 'handy' && handyService.isConnected) {
       await handyService.hsspStop()
+      return
     }
-  }, [])
+
+    if (deviceProvider === 'buttplug' && buttplugService.isConnected) {
+      await stopButtplugPlayback({ stopDevice: true })
+    }
+  }, [deviceProvider, stopButtplugPlayback])
 
   const handleSeek = useCallback(
     async (time: number) => {
-      if (handyService.isConnected && scriptUploadUrl) {
+      if (deviceProvider === 'handy' && handyService.isConnected && scriptUploadUrl) {
         const media = mediaRef.current
         if (media && !media.paused) {
           await handyService.hsspStop()
           await syncHandyPlayback(time)
         }
+        return
+      }
+
+      if (deviceProvider === 'buttplug' && buttplugService.isConnected) {
+        const media = mediaRef.current
+        if (media && !media.paused) {
+          await startButtplugPlayback()
+        }
       }
     },
-    [scriptUploadUrl, syncHandyPlayback]
+    [deviceProvider, scriptUploadUrl, startButtplugPlayback, syncHandyPlayback]
   )
 
   const handleTimeUpdate = useCallback((_time: number) => {}, [])
@@ -352,32 +844,30 @@ export default function App() {
     await openMediaFile(nextFile.path, nextFile.type, { autoplay: true })
   }, [currentFile, files, openMediaFile, playbackMode])
 
-  // Keyboard shortcuts for settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === ',') {
         e.preventDefault()
-        setSettingsOpen((v) => !v)
+        setSettingsOpen((value) => !value)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Handle drag and drop
   useEffect(() => {
     const handleDrop = async (e: DragEvent) => {
       e.preventDefault()
-      const files = e.dataTransfer?.files
-      if (!files || files.length === 0) return
+      const droppedFiles = e.dataTransfer?.files
+      if (!droppedFiles || droppedFiles.length === 0) return
 
-      const file = files[0]
+      const file = droppedFiles[0]
       const mediaType = getMediaTypeFromPath(file.name)
-      if (mediaType) {
-        const path = window.electronAPI.getDroppedFilePath(file) || (file as any).path as string
-        if (path) {
-          await openMediaFile(path, mediaType)
-        }
+      if (!mediaType) return
+
+      const path = window.electronAPI.getDroppedFilePath(file) || (file as any).path as string
+      if (path) {
+        await openMediaFile(path, mediaType)
       }
     }
 
@@ -393,15 +883,14 @@ export default function App() {
     }
   }, [openMediaFile])
 
-  // Load default folder on startup
   useEffect(() => {
     if (settings.defaultVideoFolder) {
       window.electronAPI.readDir(settings.defaultVideoFolder).then(setFiles)
     }
-  }, [])
+  }, [settings.defaultVideoFolder])
 
   useEffect(() => {
-    if (!handyConnected || handyActions.length === 0) {
+    if (deviceProvider !== 'handy' || !handyConnected || handyActions.length === 0) {
       if (handyService.isConnected) {
         void handyService.hsspStop()
       }
@@ -429,14 +918,111 @@ export default function App() {
     return () => {
       cancelled = true
     }
-  }, [handyActions, handyConnected])
+  }, [deviceProvider, handyActions, handyConnected])
 
   useEffect(() => {
-    if (!handyConnected || !scriptUploadUrl) return
+    if (deviceProvider !== 'handy' || !handyConnected || !scriptUploadUrl) return
     const media = mediaRef.current
     if (!media || media.paused) return
     void syncHandyPlayback(media.currentTime)
-  }, [handyConnected, scriptUploadUrl, syncHandyPlayback])
+  }, [deviceProvider, handyConnected, scriptUploadUrl, syncHandyPlayback])
+
+  useEffect(() => {
+    if (buttplugDevices.length === 0) {
+      return
+    }
+
+    if (selectedButtplugDeviceIndex !== null && buttplugDevices.some((device) => device.index === selectedButtplugDeviceIndex)) {
+      return
+    }
+
+    setSelectedButtplugDeviceIndex(buttplugDevices[0].index)
+  }, [buttplugDevices, selectedButtplugDeviceIndex, setSelectedButtplugDeviceIndex])
+
+  useEffect(() => {
+    if (deviceProvider === 'handy') {
+      void stopButtplugPlayback({ stopDevice: true }).then(() => {
+        if (buttplugService.isConnected) {
+          void buttplugService.disconnect()
+        }
+      })
+      return
+    }
+
+    if (deviceProvider === 'buttplug' && handyService.isConnected) {
+      void handyService.hsspStop().finally(() => {
+        handyService.disconnect()
+        setHandyConnected(false)
+        setScriptUploadUrl(null)
+      })
+    }
+  }, [deviceProvider, stopButtplugPlayback])
+
+  useEffect(() => {
+    if (
+      deviceProvider !== 'buttplug'
+      || !buttplugConnected
+      || !selectedButtplugDevice
+      || availableScriptAxes.length === 0
+    ) {
+      void stopButtplugPlayback({ stopDevice: true })
+      return
+    }
+
+    const media = mediaRef.current
+    if (!media || media.paused) return
+    void startButtplugPlayback()
+  }, [
+    availableScriptAxes.length,
+    buttplugConnected,
+    deviceProvider,
+    selectedButtplugDevice,
+    selectedButtplugFeatureMappings,
+    startButtplugPlayback,
+    stopButtplugPlayback,
+  ])
+
+  useEffect(() => {
+    return () => {
+      void stopButtplugPlayback({ stopDevice: true })
+      void buttplugService.disconnect()
+    }
+  }, [stopButtplugPlayback])
+
+  const deviceInfo = useMemo(() => {
+    if (deviceProvider === 'handy') {
+      const uploadState = getHandyOverlayStatus(handyUploadStatus)
+      return {
+        connected: handyConnected,
+        label: 'Handy',
+        detail: handyConnected && handyService.ping !== null ? `${handyService.ping}ms` : null,
+        statusText: uploadState?.text ?? null,
+        statusTone: uploadState?.tone ?? null,
+      }
+    }
+
+    return {
+      connected: buttplugConnected,
+      label: selectedButtplugDevice ? selectedButtplugDevice.displayName : 'Intiface',
+      detail: selectedButtplugDevice
+        ? `${selectedButtplugDevice.linearFeatures.length}/${selectedButtplugDevice.rotateFeatures.length}/${selectedButtplugDevice.scalarFeatures.length}`
+        : buttplugServerUrl,
+      statusText: buttplugError
+        || (buttplugScanning
+          ? 'Scanning for devices...'
+          : (!selectedButtplugDevice && buttplugConnected ? 'Select a Buttplug device.' : null)),
+      statusTone: buttplugError ? 'error' as const : (buttplugScanning ? 'busy' as const : null),
+    }
+  }, [
+    buttplugConnected,
+    buttplugError,
+    buttplugScanning,
+    buttplugServerUrl,
+    deviceProvider,
+    handyConnected,
+    handyUploadStatus,
+    selectedButtplugDevice,
+  ])
 
   return (
     <div className="h-screen flex flex-col bg-surface-300">
@@ -453,9 +1039,27 @@ export default function App() {
           onClearManualSubtitle={handleClearManualSubtitle}
           manualScriptPaths={new Set(Object.keys(manualScriptPaths))}
           manualSubtitlePaths={new Set(Object.keys(manualSubtitleFiles))}
+          deviceProvider={deviceProvider}
+          onDeviceProviderChange={setDeviceProvider}
           handyConnected={handyConnected}
           onHandyConnect={handleHandyConnect}
           onHandyDisconnect={handleHandyDisconnect}
+          buttplugConnected={buttplugConnected}
+          buttplugConnecting={buttplugConnectionState === 'connecting'}
+          buttplugDevices={buttplugDevices}
+          buttplugServerUrl={buttplugServerUrl}
+          onButtplugServerUrlChange={setButtplugServerUrl}
+          onButtplugConnect={handleButtplugConnect}
+          onButtplugDisconnect={handleButtplugDisconnect}
+          buttplugScanning={buttplugScanning}
+          onButtplugScan={handleButtplugScan}
+          selectedButtplugDeviceIndex={selectedButtplugDeviceIndex}
+          onButtplugDeviceSelect={setSelectedButtplugDeviceIndex}
+          buttplugError={buttplugError}
+          buttplugFeatures={selectedButtplugDevice?.features ?? []}
+          buttplugFeatureMappings={selectedButtplugFeatureMappings}
+          onButtplugFeatureMappingChange={setSelectedButtplugFeatureMapping}
+          buttplugAvailableAxes={availableScriptAxes}
           scriptFolder={settings.scriptFolder}
         />
         <VideoPlayer
@@ -476,7 +1080,7 @@ export default function App() {
           onPlaybackModeChange={setPlaybackMode}
           playbackRate={playbackRate}
           onPlaybackRateChange={setPlaybackRate}
-          handyInfo={handyConnected ? { connected: true, ping: handyService.ping, uploadStatus: handyUploadStatus } : { connected: false, ping: null, uploadStatus: 'idle' as const }}
+          deviceInfo={deviceInfo}
           defaultShowHeatmap={settings.showHeatmapByDefault}
           defaultShowTimeline={settings.showTimelineByDefault}
           timelineHeight={settings.timelineHeight}
@@ -494,6 +1098,19 @@ export default function App() {
       />
     </div>
   )
+}
+
+function getHandyOverlayStatus(uploadStatus: HandyUploadStatus): { text: string; tone: 'busy' | 'error' } | null {
+  switch (uploadStatus) {
+    case 'uploading':
+      return { text: 'Uploading script...', tone: 'busy' }
+    case 'setting-up':
+      return { text: 'Setting up HSSP...', tone: 'busy' }
+    case 'error':
+      return { text: 'Script upload failed', tone: 'error' }
+    default:
+      return null
+  }
 }
 
 function getFileName(filePath: string): string {

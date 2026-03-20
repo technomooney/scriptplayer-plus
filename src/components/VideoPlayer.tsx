@@ -18,16 +18,17 @@ import {
   Music4,
 } from 'lucide-react'
 import { FunscriptAction, MediaType, PlaybackMode, SubtitleCue } from '../types'
-import { HandyUploadStatus } from '../services/handy'
 import { useTranslation } from '../i18n'
 import { getActiveSubtitleText } from '../services/subtitles'
 import ScriptTimeline from './ScriptTimeline'
 import ScriptHeatmap from './ScriptHeatmap'
 
-interface HandyOverlayInfo {
+interface DeviceOverlayInfo {
   connected: boolean
-  ping: number | null
-  uploadStatus: HandyUploadStatus
+  label: string
+  detail?: string | null
+  statusText?: string | null
+  statusTone?: 'busy' | 'error' | null
 }
 
 interface VideoPlayerProps {
@@ -48,7 +49,7 @@ interface VideoPlayerProps {
   onPlaybackModeChange: (mode: PlaybackMode) => void
   playbackRate: number
   onPlaybackRateChange: (rate: number) => void
-  handyInfo?: HandyOverlayInfo | null
+  deviceInfo?: DeviceOverlayInfo | null
   defaultShowHeatmap?: boolean
   defaultShowTimeline?: boolean
   timelineHeight?: number
@@ -77,7 +78,7 @@ export default function VideoPlayer({
   onPlaybackModeChange,
   playbackRate,
   onPlaybackRateChange,
-  handyInfo,
+  deviceInfo,
   defaultShowHeatmap = false,
   defaultShowTimeline = false,
   timelineHeight = 64,
@@ -88,10 +89,10 @@ export default function VideoPlayer({
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const [playing, setPlaying] = useState(false)
-  const [showHandyOverlay, setShowHandyOverlay] = useState(false)
+  const [showDeviceOverlay, setShowDeviceOverlay] = useState(false)
   const [showHeatmap, setShowHeatmap] = useState(defaultShowHeatmap)
   const [showTimeline, setShowTimeline] = useState(defaultShowTimeline)
-  const handyOverlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const deviceOverlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null)
@@ -209,25 +210,24 @@ export default function VideoPlayer({
     }
   }, [clearHideControlsTimer, isFullscreen, playing])
 
-  // Show Handy overlay for 2s when connection status or upload status changes
-  const prevHandyConnected = useRef<boolean | undefined>(undefined)
-  const prevUploadStatus = useRef<string | undefined>(undefined)
+  // Show device overlay for connection/status changes.
+  const prevDeviceConnected = useRef<boolean | undefined>(undefined)
+  const prevStatusText = useRef<string | undefined>(undefined)
   useEffect(() => {
-    const connectionChanged = handyInfo && prevHandyConnected.current !== handyInfo.connected
-    const uploadChanged = handyInfo && prevUploadStatus.current !== handyInfo.uploadStatus
+    const connectionChanged = deviceInfo && prevDeviceConnected.current !== deviceInfo.connected
+    const statusChanged = deviceInfo && prevStatusText.current !== (deviceInfo.statusText || '')
 
-    if (connectionChanged || uploadChanged) {
-      if (handyInfo) {
-        prevHandyConnected.current = handyInfo.connected
-        prevUploadStatus.current = handyInfo.uploadStatus
+    if (connectionChanged || statusChanged) {
+      if (deviceInfo) {
+        prevDeviceConnected.current = deviceInfo.connected
+        prevStatusText.current = deviceInfo.statusText || ''
       }
-      setShowHandyOverlay(true)
-      if (handyOverlayTimer.current) clearTimeout(handyOverlayTimer.current)
-      // Keep overlay longer for upload status, shorter for connection
-      const delay = handyInfo?.uploadStatus === 'ready' ? 2000 : (uploadChanged ? 4000 : 2000)
-      handyOverlayTimer.current = setTimeout(() => setShowHandyOverlay(false), delay)
+      setShowDeviceOverlay(true)
+      if (deviceOverlayTimer.current) clearTimeout(deviceOverlayTimer.current)
+      const delay = statusChanged ? 4000 : 2000
+      deviceOverlayTimer.current = setTimeout(() => setShowDeviceOverlay(false), delay)
     }
-  }, [handyInfo?.connected, handyInfo?.ping, handyInfo?.uploadStatus])
+  }, [deviceInfo?.connected, deviceInfo?.label, deviceInfo?.statusText])
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -257,7 +257,7 @@ export default function VideoPlayer({
   useEffect(() => {
     return () => {
       clearHideControlsTimer()
-      if (handyOverlayTimer.current) clearTimeout(handyOverlayTimer.current)
+      if (deviceOverlayTimer.current) clearTimeout(deviceOverlayTimer.current)
     }
   }, [clearHideControlsTimer])
 
@@ -478,42 +478,42 @@ export default function VideoPlayer({
           </div>
         )}
 
-        {/* Handy connection overlay */}
-        {showHandyOverlay && handyInfo && (
+        {/* Device connection overlay */}
+        {showDeviceOverlay && deviceInfo && (
           <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 animate-fade-in">
             <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2">
               <div
                 className={`w-2 h-2 rounded-full ${
-                  handyInfo.connected ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]' : 'bg-red-400'
+                  deviceInfo.connected ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]' : 'bg-red-400'
                 }`}
               />
               <span className="text-xs text-white font-medium">
-                {handyInfo.connected ? 'Handy Connected' : 'Handy Disconnected'}
+                {deviceInfo.connected ? `${deviceInfo.label} Connected` : `${deviceInfo.label} Disconnected`}
               </span>
-              {handyInfo.connected && handyInfo.ping !== null && (
+              {deviceInfo.detail && (
                 <span className="text-[10px] text-text-muted font-mono">
-                  {handyInfo.ping}ms
+                  {deviceInfo.detail}
                 </span>
               )}
             </div>
           </div>
         )}
 
-        {/* Handy upload status (persistent when uploading/error) */}
-        {handyInfo?.connected && handyInfo.uploadStatus !== 'idle' && handyInfo.uploadStatus !== 'ready' && (
+        {/* Device status badge (persistent for active work/error) */}
+        {deviceInfo?.statusText && (
           <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 animate-fade-in">
-            {(handyInfo.uploadStatus === 'uploading' || handyInfo.uploadStatus === 'setting-up') && (
+            {deviceInfo.statusTone === 'busy' && (
               <>
                 <Loader2 size={14} className="text-accent animate-spin" />
                 <span className="text-xs text-white">
-                  {handyInfo.uploadStatus === 'uploading' ? 'Uploading script...' : 'Setting up HSSP...'}
+                  {deviceInfo.statusText}
                 </span>
               </>
             )}
-            {handyInfo.uploadStatus === 'error' && (
+            {deviceInfo.statusTone === 'error' && (
               <>
                 <AlertCircle size={14} className="text-red-400" />
-                <span className="text-xs text-red-400">Script upload failed</span>
+                <span className="text-xs text-red-400">{deviceInfo.statusText}</span>
               </>
             )}
           </div>

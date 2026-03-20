@@ -4,7 +4,9 @@ import fs from 'fs'
 import http from 'http'
 import https from 'https'
 import { URL } from 'url'
+import { SCRIPT_AXIS_DEFINITIONS, inferAxisIdFromStem, stripKnownAxisSuffix } from '../src/services/multiaxis'
 import { getVideoSubtitleMatchScore, parseSubtitleFile } from '../src/services/subtitles'
+import { ScriptAxisId } from '../src/types'
 
 const isMac = process.platform === 'darwin'
 const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.webm', '.mov', '.wmv']
@@ -44,6 +46,7 @@ const SCAN_YIELD_INTERVAL = 25
 let mainWindow: BrowserWindow | null = null
 const subtitleCandidateCache = new Map<string, string[]>()
 const subtitleAnalysisCache = new Map<string, { content: string; hasCues: boolean } | null>()
+const FUNSCRIPT_EXTS = ['.funscript', '.json']
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -172,14 +175,12 @@ ipcMain.handle('fs:readDir', async (_event, dirPath: string) => {
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name).toLowerCase()
           if (MEDIA_EXTS.includes(ext)) {
-            const baseName = path.basename(entry.name, ext)
-            const scriptPath = path.join(dir, baseName + '.funscript')
             const hasSubtitles = hasSubtitlesForMediaScan(fullPath)
             files.push({
               name: entry.name,
               path: fullPath,
               type: VIDEO_EXTS.includes(ext) ? 'video' : 'audio',
-              hasScript: fs.existsSync(scriptPath),
+              hasScript: hasBundledFunscriptsForMediaScan(fullPath),
               hasSubtitles,
               relativePath: prefix ? prefix + '/' + entry.name : entry.name,
             })
@@ -196,27 +197,13 @@ ipcMain.handle('fs:readDir', async (_event, dirPath: string) => {
 })
 
 ipcMain.handle('fs:readFunscript', async (_event, videoPath: string, scriptFolder?: string) => {
-  const ext = path.extname(videoPath)
-  const baseName = path.basename(videoPath, ext)
+  const bundle = readFunscriptBundle(videoPath, scriptFolder)
+  if (!bundle?.primaryAxis) return null
+  return bundle.scripts[bundle.primaryAxis] ?? null
+})
 
-  // 1. Check next to video file
-  const scriptPath = videoPath.replace(ext, '.funscript')
-  try {
-    const content = fs.readFileSync(scriptPath, 'utf-8')
-    return JSON.parse(content)
-  } catch {}
-
-  // 2. Fallback: check script storage folder
-  if (scriptFolder) {
-    try {
-      const fallbackPath = path.join(scriptFolder, baseName + '.funscript')
-      const content = fs.readFileSync(fallbackPath, 'utf-8')
-      console.log('[Script] Found in script folder:', fallbackPath)
-      return JSON.parse(content)
-    } catch {}
-  }
-
-  return null
+ipcMain.handle('fs:readFunscriptBundle', async (_event, videoPath: string, scriptFolder?: string, preferredScriptPath?: string) => {
+  return readFunscriptBundle(videoPath, scriptFolder, preferredScriptPath)
 })
 
 ipcMain.handle('fs:saveFunscript', async (_event, videoPath: string, data: string) => {
@@ -263,12 +250,7 @@ ipcMain.handle('fs:readSubtitles', async (_event, mediaPath: string) => {
 })
 
 ipcMain.handle('fs:readFunscriptFile', async (_event, filePath: string) => {
-  try {
-    const content = fs.readFileSync(filePath, 'utf-8')
-    return JSON.parse(content)
-  } catch {
-    return null
-  }
+  return readFunscriptJson(filePath)
 })
 
 ipcMain.handle('fs:readSubtitleFile', async (_event, filePath: string) => {
@@ -287,6 +269,132 @@ ipcMain.handle('fs:readSubtitleFile', async (_event, filePath: string) => {
 // ============================================================
 
 const NAS_EXTS = [...MEDIA_EXTS, '.funscript']
+
+function hasBundledFunscriptsForMediaScan(mediaPath: string): boolean {
+  const mediaDir = path.dirname(mediaPath)
+  const mediaBaseName = path.basename(mediaPath, path.extname(mediaPath))
+
+  for (const definition of SCRIPT_AXIS_DEFINITIONS) {
+    for (const suffix of definition.suffixes) {
+      const fileName = suffix
+        ? `${mediaBaseName}.${suffix}.funscript`
+        : `${mediaBaseName}.funscript`
+      if (fs.existsSync(path.join(mediaDir, fileName))) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+function readFunscriptBundle(
+  mediaPath: string,
+  scriptFolder?: string,
+  preferredScriptPath?: string
+): { primaryAxis: ScriptAxisId | null; scripts: Partial<Record<ScriptAxisId, unknown>>; sources: Partial<Record<ScriptAxisId, string>> } | null {
+  const bundle: {
+    primaryAxis: ScriptAxisId | null
+    scripts: Partial<Record<ScriptAxisId, unknown>>
+    sources: Partial<Record<ScriptAxisId, string>>
+  } = {
+    primaryAxis: null,
+    scripts: {},
+    sources: {},
+  }
+  const loadedPaths = new Set<string>()
+  const mediaBaseName = path.basename(mediaPath, path.extname(mediaPath))
+
+  if (preferredScriptPath) {
+    addFunscriptToBundle(bundle, loadedPaths, preferredScriptPath, inferAxisIdFromFilePath(preferredScriptPath))
+  }
+
+  const contexts = [
+    { dir: path.dirname(mediaPath), baseNames: [mediaBaseName] },
+  ]
+
+  if (scriptFolder) {
+    contexts.push({ dir: scriptFolder, baseNames: [mediaBaseName] })
+  }
+
+  if (preferredScriptPath) {
+    const preferredBaseName = stripKnownAxisSuffix(path.basename(preferredScriptPath, path.extname(preferredScriptPath)))
+    contexts.unshift({
+      dir: path.dirname(preferredScriptPath),
+      baseNames: Array.from(new Set([preferredBaseName, mediaBaseName])).filter(Boolean),
+    })
+  }
+
+  for (const context of contexts) {
+    for (const baseName of context.baseNames) {
+      addBundleCandidates(bundle, loadedPaths, context.dir, baseName)
+    }
+  }
+
+  if (bundle.primaryAxis === null) {
+    bundle.primaryAxis = Object.keys(bundle.scripts)[0] as ScriptAxisId | undefined ?? null
+  }
+
+  return Object.keys(bundle.scripts).length > 0 ? bundle : null
+}
+
+function addBundleCandidates(
+  bundle: { primaryAxis: ScriptAxisId | null; scripts: Partial<Record<ScriptAxisId, unknown>>; sources: Partial<Record<ScriptAxisId, string>> },
+  loadedPaths: Set<string>,
+  dirPath: string,
+  baseName: string
+) {
+  for (const definition of SCRIPT_AXIS_DEFINITIONS) {
+    if (bundle.scripts[definition.id]) continue
+
+    for (const suffix of definition.suffixes) {
+      const fileName = suffix
+        ? `${baseName}.${suffix}.funscript`
+        : `${baseName}.funscript`
+      const filePath = path.join(dirPath, fileName)
+      if (!fs.existsSync(filePath)) continue
+
+      addFunscriptToBundle(bundle, loadedPaths, filePath, definition.id)
+      break
+    }
+  }
+}
+
+function addFunscriptToBundle(
+  bundle: { primaryAxis: ScriptAxisId | null; scripts: Partial<Record<ScriptAxisId, unknown>>; sources: Partial<Record<ScriptAxisId, string>> },
+  loadedPaths: Set<string>,
+  filePath: string,
+  preferredAxis: ScriptAxisId | null
+) {
+  if (loadedPaths.has(filePath)) return
+
+  const parsed = readFunscriptJson(filePath)
+  if (!parsed) return
+
+  const axisId = preferredAxis ?? inferAxisIdFromFilePath(filePath) ?? 'L0'
+  if (bundle.scripts[axisId]) return
+
+  bundle.scripts[axisId] = parsed
+  bundle.sources[axisId] = filePath
+  bundle.primaryAxis = bundle.primaryAxis ?? axisId
+  loadedPaths.add(filePath)
+}
+
+function inferAxisIdFromFilePath(filePath: string): ScriptAxisId | null {
+  const stem = path.basename(filePath, path.extname(filePath))
+  return inferAxisIdFromStem(stem)
+}
+
+function readFunscriptJson(filePath: string): unknown | null {
+  try {
+    const ext = path.extname(filePath).toLowerCase()
+    if (!FUNSCRIPT_EXTS.includes(ext)) return null
+    const content = fs.readFileSync(filePath, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+}
 
 function findArtworkForMedia(mediaPath: string): string | null {
   const dir = path.dirname(mediaPath)
