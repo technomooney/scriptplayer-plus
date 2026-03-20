@@ -40,9 +40,9 @@
 
 `v0.1.5-exp.1` 预发布为 Intiface 已识别的兼容设备加入了实验性的 `Intiface / Buttplug` 多轴控制。FUNSR 系列 SR1 / SR6 / PRO 只要能被 Intiface 正确识别，也可以通过这一路径进行测试。
 
-| Intiface / Buttplug 实验设置 |
+| v0.1.5-exp.1 预览 |
 |:-:|
-| ![Intiface / Buttplug 实验设置](screenshots/device_settings_v014.png) |
+| ![v0.1.5-exp.1 预览](screenshots/preview_v015_exp1.png) |
 
 - 下载预发布版本: [ScriptPlayer+ v0.1.5-exp.1](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 

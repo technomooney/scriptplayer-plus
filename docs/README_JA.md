@@ -40,9 +40,9 @@
 
 `v0.1.5-exp.1` のプレリリースでは、Intiface が認識した互換デバイス向けに実験的な `Intiface / Buttplug` マルチアクシス制御を追加しています。FUNSR 系の SR1 / SR6 / PRO も、Intiface で正しく検出されればこの経路でテストできます。
 
-| Intiface / Buttplug 実験設定 |
+| v0.1.5-exp.1 プレビュー |
 |:-:|
-| ![Intiface / Buttplug 実験設定](screenshots/device_settings_v014.png) |
+| ![v0.1.5-exp.1 プレビュー](screenshots/preview_v015_exp1.png) |
 
 - プレリリースのダウンロード: [ScriptPlayer+ v0.1.5-exp.1](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 

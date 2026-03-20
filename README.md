@@ -40,9 +40,9 @@
 
 The `v0.1.5-exp.1` prerelease adds experimental `Intiface / Buttplug` multi-axis support for compatible devices exposed by Intiface. This includes FUNSR-style SR1 / SR6 / PRO setups when they are detected correctly by Intiface.
 
-| Experimental Intiface Device Settings |
+| Experimental v0.1.5 Preview |
 |:-:|
-| ![Experimental Intiface Device Settings](docs/screenshots/device_settings_v014.png) |
+| ![Experimental v0.1.5 Preview](docs/screenshots/preview_v015_exp1.png) |
 
 - Download the prerelease: [ScriptPlayer+ v0.1.5-exp.1](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.1)
 
