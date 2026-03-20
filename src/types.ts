@@ -24,6 +24,7 @@ export interface Funscript {
 }
 
 export type MediaType = 'video' | 'audio'
+export type PlaybackMode = 'none' | 'sequential' | 'shuffle'
 
 export interface VideoFile {
   name: string

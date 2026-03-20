@@ -17,6 +17,9 @@ const ko: Record<string, string> = {
   'player.audioMode': '\uC624\uB514\uC624 \uC7AC\uC0DD',
   'player.fullscreen': '\uC804\uCCB4 \uD654\uBA74',
   'player.subtitles': '\uC790\uB9C9',
+  'player.continuousPlayback': '\uC5F0\uC18D \uC7AC\uC0DD',
+  'player.shufflePlayback': '\uB79C\uB364 \uC7AC\uC0DD',
+  'player.playbackSpeed': '\uC7AC\uC0DD \uC18D\uB3C4',
 
   'eroscripts.search': 'EroScripts \uAC80\uC0C9...',
   'eroscripts.autoSearch': '\uD604\uC7AC \uB3D9\uC601\uC0C1 \uC790\uB3D9 \uAC80\uC0C9',
@@ -95,6 +98,8 @@ const ko: Record<string, string> = {
   'settings.visibleWindow': '\uD45C\uC2DC \uCC3D',
   'settings.strokeRangeMin': '\uC2A4\uD2B8\uB85C\uD06C \uBC94\uC704 \uCD5C\uC18C',
   'settings.strokeRangeMax': '\uC2A4\uD2B8\uB85C\uD06C \uBC94\uC704 \uCD5C\uB300',
+  'settings.inverseStroke': '\uC2A4\uD2B8\uB85C\uD06C \uBC18\uC804',
+  'settings.inverseStrokeDesc': '\uC7A5\uCE58\uC5D0 \uC804\uC1A1\uD558\uAE30 \uC804\uC5D0 \uD380\uC2A4\uD06C\uB9BD\uD2B8 \uC2A4\uD2B8\uB85C\uD06C\uB97C \uBC18\uC804\uD569\uB2C8\uB2E4',
   'settings.timeOffset': '\uC2DC\uAC04 \uC624\uD504\uC14B',
   'settings.handyConnectionKey': 'Handy \uC5F0\uACB0 \uD0A4',
   'settings.getKeyFrom': '\uD0A4\uB97C \uD655\uC778\uD558\uC138\uC694:',

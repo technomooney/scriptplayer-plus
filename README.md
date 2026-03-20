@@ -32,17 +32,18 @@
 |:-:|:-:|
 | ![Settings](docs/screenshots/setting.png) | ![macOS](docs/screenshots/macos.png) |
 
-## What's New In v0.1.3
+## What's New In v0.1.4
 
-- **Edge-To-Edge Fullscreen Video** — Fullscreen playback now fills the screen instead of leaving unused letterboxed space
-- **Auto-Hiding Fullscreen Controls** — The playback bar and scripted overlays fade away while playing so the video can use the full area
-- **Expanded Subtitle Detection** — Matching `.vtt`, `.srt`, or timestamped `.txt` files can now be detected from the media folder and common subtitle/script subfolders
-- **Version Sync Cleanup** — UI version badges now read directly from the app package version to keep releases aligned
+- **Continuous Playback + Shuffle** — Move through the current folder automatically or pick a random next file when playback ends
+- **Playback Speed Control** — Switch between `0.5x` and `2.0x` directly in the player while keeping Handy timing aligned
+- **Real Handy Stroke Range Support** — Handy stroke min/max settings now transform the uploaded script instead of only changing the UI
+- **Inverse Stroke Mode** — Flip funscript positions before upload for alternate mounting or reversed motion setups
 
 ## Features
 
 - **Video + Audio Player** — Play local video files (MP4, MKV, AVI, WebM, MOV, WMV) and audio files (MP3, WAV, FLAC, M4A, AAC, OGG, OPUS, WMA)
 - **Artwork Detection For Audio** — Automatically picks matching cover art from the media folder when available
+- **Playback Modes** — Continuous playback, shuffle playback, and adjustable playback speed controls
 - **Funscript Support** — Automatically loads matching `.funscript` files alongside local media
 - **Timeline Visualization** — Real-time scrolling timeline showing script action points with speed-based colors
 - **Heatmap** — Full-media intensity heatmap (green → yellow → orange → red → purple)
@@ -52,6 +53,7 @@
   - Script auto-upload to Handy servers
   - Time offset adjustment
   - Stroke range customization
+  - Inverse stroke toggle
 - **EroScripts Integration** — Search and download funscripts directly from EroScripts via in-app browser login (no API key needed)
   - Session-based login persisted locally
   - Direct download into the configured script storage folder
@@ -65,7 +67,7 @@
 
 ### Windows
 
-1. Download the latest `ScriptPlayerPlus-0.1.3-Windows-x64.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
+1. Download the latest `ScriptPlayerPlus-0.1.4-Windows-x64.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and run `ScriptPlayerPlus.exe` — no installation required
 
 ### macOS

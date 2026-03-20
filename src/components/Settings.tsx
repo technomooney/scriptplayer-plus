@@ -351,6 +351,18 @@ function DeviceSection({
       <Divider />
 
       <FieldRow
+        label={t('settings.inverseStroke')}
+        description={t('settings.inverseStrokeDesc')}
+      >
+        <Toggle
+          checked={settings.invertStroke}
+          onChange={(v) => update('invertStroke', v)}
+        />
+      </FieldRow>
+
+      <Divider />
+
+      <FieldRow
         label={t('settings.timeOffset')}
         description={`${settings.timeOffset >= 0 ? '+' : ''}${settings.timeOffset} ms`}
       >

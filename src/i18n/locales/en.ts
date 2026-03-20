@@ -17,6 +17,9 @@ const en: Record<string, string> = {
   'player.audioMode': 'Audio playback',
   'player.fullscreen': 'Fullscreen',
   'player.subtitles': 'Subtitles',
+  'player.continuousPlayback': 'Continuous playback',
+  'player.shufflePlayback': 'Shuffle playback',
+  'player.playbackSpeed': 'Playback speed',
 
   'eroscripts.search': 'Search EroScripts...',
   'eroscripts.autoSearch': 'Auto-search for current video',
@@ -96,6 +99,8 @@ const en: Record<string, string> = {
   'settings.visibleWindow': 'Visible Window',
   'settings.strokeRangeMin': 'Stroke Range Min',
   'settings.strokeRangeMax': 'Stroke Range Max',
+  'settings.inverseStroke': 'Inverse Stroke',
+  'settings.inverseStrokeDesc': 'Flip funscript stroke positions before sending them to the device',
   'settings.timeOffset': 'Time Offset',
   'settings.handyConnectionKey': 'Handy Connection Key',
   'settings.getKeyFrom': 'Get your key from',

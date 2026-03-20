@@ -1,5 +1,12 @@
 import { Funscript, FunscriptAction } from '../types'
 
+interface TransformActionOptions {
+  strokeMin?: number
+  strokeMax?: number
+  invert?: boolean
+  timeScale?: number
+}
+
 export function parseFunscript(data: unknown): Funscript | null {
   try {
     const script = data as Funscript
@@ -18,6 +25,31 @@ export function parseFunscript(data: unknown): Funscript | null {
   } catch {
     return null
   }
+}
+
+export function transformFunscriptActions(
+  actions: FunscriptAction[],
+  {
+    strokeMin = 0,
+    strokeMax = 100,
+    invert = false,
+    timeScale = 1,
+  }: TransformActionOptions = {}
+): FunscriptAction[] {
+  const min = clampPosition(Math.min(strokeMin, strokeMax))
+  const max = clampPosition(Math.max(strokeMin, strokeMax))
+  const range = max - min
+  const scale = Number.isFinite(timeScale) && timeScale > 0 ? timeScale : 1
+
+  return actions.map((action) => {
+    const normalized = clampPosition(action.pos) / 100
+    const mapped = invert ? 1 - normalized : normalized
+
+    return {
+      at: Math.max(0, action.at * scale),
+      pos: clampPosition(min + mapped * range),
+    }
+  })
 }
 
 /** Get the interpolated position at a given time */
@@ -90,4 +122,8 @@ export function getSpeed(a: FunscriptAction, b: FunscriptAction): number {
   if (dt === 0) return 0
   const dp = Math.abs(b.pos - a.pos)
   return (dp / dt) * 1000
+}
+
+function clampPosition(pos: number): number {
+  return Math.max(0, Math.min(100, pos))
 }

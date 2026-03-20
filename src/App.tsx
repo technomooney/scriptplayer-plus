@@ -3,8 +3,8 @@ import TitleBar from './components/TitleBar'
 import Sidebar from './components/Sidebar'
 import VideoPlayer from './components/VideoPlayer'
 import Settings from './components/Settings'
-import { VideoFile, Funscript, FunscriptAction, MediaType, SubtitleCue, SubtitleFile } from './types'
-import { parseFunscript } from './services/funscript'
+import { VideoFile, Funscript, FunscriptAction, MediaType, PlaybackMode, SubtitleCue, SubtitleFile } from './types'
+import { parseFunscript, transformFunscriptActions } from './services/funscript'
 import { handyService, HandyUploadStatus } from './services/handy'
 import { AppSettings, loadSettings, saveSettings } from './services/settings'
 import { getVideoSubtitleMatchScore, parseSubtitleFile } from './services/subtitles'
@@ -12,12 +12,75 @@ import { useTranslation } from './i18n'
 
 const VIDEO_EXTS = ['.mp4', '.mkv', '.avi', '.webm', '.mov', '.wmv']
 const AUDIO_EXTS = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wma']
+const PLAYBACK_MODE_STORAGE_KEY = 'scriptplayer-playback-mode'
+const PLAYBACK_RATE_STORAGE_KEY = 'scriptplayer-playback-rate'
 
 function getMediaTypeFromPath(filePath: string): MediaType | null {
   const ext = '.' + (filePath.split('.').pop()?.toLowerCase() || '')
   if (VIDEO_EXTS.includes(ext)) return 'video'
   if (AUDIO_EXTS.includes(ext)) return 'audio'
   return null
+}
+
+function loadPlaybackMode(): PlaybackMode {
+  try {
+    const stored = localStorage.getItem(PLAYBACK_MODE_STORAGE_KEY)
+    if (stored === 'sequential' || stored === 'shuffle' || stored === 'none') {
+      return stored
+    }
+  } catch {
+    // Ignore storage failures
+  }
+
+  return 'none'
+}
+
+function loadPlaybackRate(): number {
+  try {
+    const stored = Number(localStorage.getItem(PLAYBACK_RATE_STORAGE_KEY))
+    if (Number.isFinite(stored) && stored > 0) {
+      return stored
+    }
+  } catch {
+    // Ignore storage failures
+  }
+
+  return 1
+}
+
+function getPlaybackTimeScale(playbackRate: number): number {
+  return 1 / (Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1)
+}
+
+function getHandyStartTime(mediaTimeSeconds: number, playbackRate: number, timeOffset: number): number {
+  const baseTime = mediaTimeSeconds * 1000 * getPlaybackTimeScale(playbackRate)
+  return Math.max(0, Math.round(baseTime + timeOffset))
+}
+
+function getNextPlaybackFile(
+  files: VideoFile[],
+  currentFile: string | null,
+  playbackMode: PlaybackMode
+): VideoFile | null {
+  if (playbackMode === 'none' || !currentFile || files.length === 0) {
+    return null
+  }
+
+  const currentIndex = files.findIndex((file) => file.path === currentFile)
+  if (currentIndex < 0) {
+    return null
+  }
+
+  if (playbackMode === 'sequential') {
+    return currentIndex < files.length - 1 ? files[currentIndex + 1] : null
+  }
+
+  if (files.length === 1) {
+    return null
+  }
+
+  const candidates = files.filter((file) => file.path !== currentFile)
+  return candidates[Math.floor(Math.random() * candidates.length)] ?? null
 }
 
 export default function App() {
@@ -36,9 +99,26 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
   const [manualScriptPaths, setManualScriptPaths] = useState<Record<string, string>>({})
   const [manualSubtitleFiles, setManualSubtitleFiles] = useState<Record<string, SubtitleFile>>({})
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(loadPlaybackMode)
+  const [playbackRate, setPlaybackRate] = useState<number>(loadPlaybackRate)
+  const [autoPlayRequestId, setAutoPlayRequestId] = useState(0)
   const mediaRef = useRef<HTMLMediaElement | null>(null)
+  const handyUploadRequestId = useRef(0)
 
   const actions: FunscriptAction[] = funscript?.actions || []
+  const displayActions = useMemo(
+    () =>
+      transformFunscriptActions(actions, {
+        strokeMin: settings.strokeRangeMin,
+        strokeMax: settings.strokeRangeMax,
+        invert: settings.invertStroke,
+      }),
+    [actions, settings.strokeRangeMin, settings.strokeRangeMax, settings.invertStroke]
+  )
+  const handyActions = useMemo(
+    () => transformFunscriptActions(displayActions, { timeScale: getPlaybackTimeScale(playbackRate) }),
+    [displayActions, playbackRate]
+  )
   const displayFiles = useMemo(
     () => files.map((file) => ({
       ...file,
@@ -62,6 +142,22 @@ export default function App() {
       setLocale(settings.language)
     }
   }, [settings.language])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PLAYBACK_MODE_STORAGE_KEY, playbackMode)
+    } catch {
+      // Ignore storage failures
+    }
+  }, [playbackMode])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PLAYBACK_RATE_STORAGE_KEY, playbackRate.toString())
+    } catch {
+      // Ignore storage failures
+    }
+  }, [playbackRate])
 
   const handleSettingsChange = useCallback((newSettings: AppSettings) => {
     setSettings(newSettings)
@@ -97,9 +193,26 @@ export default function App() {
     setFiles(mediaFiles)
   }, [])
 
-  const openMediaFile = useCallback(async (filePath: string, fileType?: MediaType) => {
+  const openMediaFile = useCallback(async (
+    filePath: string,
+    fileType?: MediaType,
+    options?: { autoplay?: boolean }
+  ) => {
     const resolvedType = fileType ?? getMediaTypeFromPath(filePath)
     if (!resolvedType) return
+
+    if (handyService.isConnected) {
+      await handyService.hsspStop()
+    }
+
+    const currentMedia = mediaRef.current
+    if (currentMedia && !currentMedia.paused) {
+      currentMedia.pause()
+    }
+
+    if (options?.autoplay) {
+      setAutoPlayRequestId((prev) => prev + 1)
+    }
 
     setCurrentFile(filePath)
     setCurrentFileType(resolvedType)
@@ -126,10 +239,6 @@ export default function App() {
       const nextArtworkUrl = await window.electronAPI.getVideoUrl(artworkPath)
       setArtworkUrl(nextArtworkUrl)
     }
-
-    if (parsed && handyService.isConnected) {
-      uploadToHandy(parsed.actions)
-    }
   }, [loadScript, loadSubtitleCues])
 
   const handleFileSelect = useCallback(async (file: VideoFile) => {
@@ -146,12 +255,6 @@ export default function App() {
       const parsed = await window.electronAPI.readFunscriptFile(scriptPath)
       const nextScript = parsed ? parseFunscript(parsed) : null
       setFunscript(nextScript)
-
-      if (nextScript && handyService.isConnected) {
-        uploadToHandy(nextScript.actions)
-      } else {
-        setScriptUploadUrl(null)
-      }
     }
   }, [currentFile])
 
@@ -182,12 +285,6 @@ export default function App() {
       const script = await window.electronAPI.readFunscript(file.path, settings.scriptFolder)
       const parsed = script ? parseFunscript(script) : null
       setFunscript(parsed)
-
-      if (parsed && handyService.isConnected) {
-        uploadToHandy(parsed.actions)
-      } else {
-        setScriptUploadUrl(null)
-      }
     }
   }, [currentFile, settings.scriptFolder])
 
@@ -204,41 +301,29 @@ export default function App() {
     }
   }, [currentFile])
 
-  const uploadToHandy = async (scriptActions: FunscriptAction[]) => {
-    const url = await handyService.uploadAndSetup(scriptActions)
-    if (url) {
-      setScriptUploadUrl(url)
-      console.log('[App] Script uploaded and HSSP ready:', url)
-    } else {
-      setScriptUploadUrl(null)
-      console.error('[App] Failed to upload script to Handy')
-    }
-  }
-
   const handleHandyConnect = async (key: string) => {
     const connected = await handyService.connect(key)
     setHandyConnected(connected)
-    if (connected && funscript) {
-      uploadToHandy(funscript.actions)
-    }
   }
 
-  const handleHandyDisconnect = () => {
+  const handleHandyDisconnect = async () => {
+    await handyService.hsspStop()
     handyService.disconnect()
     setHandyConnected(false)
     setScriptUploadUrl(null)
   }
 
+  const syncHandyPlayback = useCallback(async (mediaTimeSeconds: number) => {
+    if (!handyService.isConnected || !scriptUploadUrl) return
+    const startTime = getHandyStartTime(mediaTimeSeconds, playbackRate, settings.timeOffset || 0)
+    await handyService.hsspPlay(handyService.getServerTime(), startTime)
+  }, [playbackRate, scriptUploadUrl, settings.timeOffset])
+
   const handlePlay = useCallback(async () => {
-    if (handyService.isConnected && scriptUploadUrl) {
-      const media = mediaRef.current
-      if (media) {
-        const serverTime = handyService.getServerTime()
-        const offset = settings.timeOffset || 0
-        await handyService.hsspPlay(serverTime, Math.round(media.currentTime * 1000) + offset)
-      }
-    }
-  }, [scriptUploadUrl, settings.timeOffset])
+    const media = mediaRef.current
+    if (!media) return
+    await syncHandyPlayback(media.currentTime)
+  }, [syncHandyPlayback])
 
   const handlePause = useCallback(async () => {
     if (handyService.isConnected) {
@@ -252,16 +337,20 @@ export default function App() {
         const media = mediaRef.current
         if (media && !media.paused) {
           await handyService.hsspStop()
-          const serverTime = handyService.getServerTime()
-          const offset = settings.timeOffset || 0
-          await handyService.hsspPlay(serverTime, Math.round(time * 1000) + offset)
+          await syncHandyPlayback(time)
         }
       }
     },
-    [scriptUploadUrl, settings.timeOffset]
+    [scriptUploadUrl, syncHandyPlayback]
   )
 
   const handleTimeUpdate = useCallback((_time: number) => {}, [])
+
+  const handleEnded = useCallback(async () => {
+    const nextFile = getNextPlaybackFile(files, currentFile, playbackMode)
+    if (!nextFile) return
+    await openMediaFile(nextFile.path, nextFile.type, { autoplay: true })
+  }, [currentFile, files, openMediaFile, playbackMode])
 
   // Keyboard shortcuts for settings
   useEffect(() => {
@@ -311,6 +400,44 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!handyConnected || handyActions.length === 0) {
+      if (handyService.isConnected) {
+        void handyService.hsspStop()
+      }
+      setScriptUploadUrl(null)
+      return
+    }
+
+    let cancelled = false
+    const requestId = ++handyUploadRequestId.current
+
+    setScriptUploadUrl(null)
+
+    const runUpload = async () => {
+      await handyService.hsspStop()
+      const url = await handyService.uploadAndSetup(handyActions)
+      if (cancelled || requestId !== handyUploadRequestId.current) {
+        return
+      }
+
+      setScriptUploadUrl(url)
+    }
+
+    void runUpload()
+
+    return () => {
+      cancelled = true
+    }
+  }, [handyActions, handyConnected])
+
+  useEffect(() => {
+    if (!handyConnected || !scriptUploadUrl) return
+    const media = mediaRef.current
+    if (!media || media.paused) return
+    void syncHandyPlayback(media.currentTime)
+  }, [handyConnected, scriptUploadUrl, syncHandyPlayback])
+
   return (
     <div className="h-screen flex flex-col bg-surface-300">
       <TitleBar onOpenSettings={() => setSettingsOpen(true)} />
@@ -336,13 +463,19 @@ export default function App() {
           mediaType={currentFileType}
           currentFileName={currentFile ? getFileName(currentFile) : null}
           artworkUrl={artworkUrl}
-          actions={actions}
+          actions={displayActions}
           subtitleCues={subtitleCues}
           onTimeUpdate={handleTimeUpdate}
           onPlay={handlePlay}
           onPause={handlePause}
           onSeek={handleSeek}
+          onEnded={handleEnded}
           mediaRef={mediaRef}
+          autoPlayRequestId={autoPlayRequestId}
+          playbackMode={playbackMode}
+          onPlaybackModeChange={setPlaybackMode}
+          playbackRate={playbackRate}
+          onPlaybackRateChange={setPlaybackRate}
           handyInfo={handyConnected ? { connected: true, ping: handyService.ping, uploadStatus: handyUploadStatus } : { connected: false, ping: null, uploadStatus: 'idle' as const }}
           defaultShowHeatmap={settings.showHeatmapByDefault}
           defaultShowTimeline={settings.showTimelineByDefault}

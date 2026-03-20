@@ -4,6 +4,8 @@ import {
   Pause,
   SkipBack,
   SkipForward,
+  Repeat,
+  Shuffle,
   Volume2,
   VolumeX,
   Maximize,
@@ -15,7 +17,7 @@ import {
   Loader2,
   Music4,
 } from 'lucide-react'
-import { FunscriptAction, MediaType, SubtitleCue } from '../types'
+import { FunscriptAction, MediaType, PlaybackMode, SubtitleCue } from '../types'
 import { HandyUploadStatus } from '../services/handy'
 import { useTranslation } from '../i18n'
 import { getActiveSubtitleText } from '../services/subtitles'
@@ -36,10 +38,16 @@ interface VideoPlayerProps {
   actions: FunscriptAction[]
   subtitleCues: SubtitleCue[]
   onTimeUpdate: (time: number) => void
-  onPlay: () => void
-  onPause: () => void
-  onSeek: (time: number) => void
+  onPlay: () => void | Promise<void>
+  onPause: () => void | Promise<void>
+  onSeek: (time: number) => void | Promise<void>
+  onEnded: () => void | Promise<void>
   mediaRef: React.MutableRefObject<HTMLMediaElement | null>
+  autoPlayRequestId: number
+  playbackMode: PlaybackMode
+  onPlaybackModeChange: (mode: PlaybackMode) => void
+  playbackRate: number
+  onPlaybackRateChange: (rate: number) => void
   handyInfo?: HandyOverlayInfo | null
   defaultShowHeatmap?: boolean
   defaultShowTimeline?: boolean
@@ -48,6 +56,8 @@ interface VideoPlayerProps {
   speedColors?: boolean
   subtitleFontSize?: number
 }
+
+const PLAYBACK_RATE_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
 export default function VideoPlayer({
   videoUrl,
@@ -60,7 +70,13 @@ export default function VideoPlayer({
   onPlay,
   onPause,
   onSeek,
+  onEnded,
   mediaRef,
+  autoPlayRequestId,
+  playbackMode,
+  onPlaybackModeChange,
+  playbackRate,
+  onPlaybackRateChange,
   handyInfo,
   defaultShowHeatmap = false,
   defaultShowTimeline = false,
@@ -89,6 +105,7 @@ export default function VideoPlayer({
   const [showControls, setShowControls] = useState(true)
   const [showSubtitles, setShowSubtitles] = useState(subtitleCues.length > 0)
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handledAutoPlayRequest = useRef(0)
   const currentSubtitleText = showSubtitles ? getActiveSubtitleText(subtitleCues, currentTime) : ''
   const isPortraitVideo = videoAspectRatio !== null && videoAspectRatio < 1
   const controlsVisible = showControls || !playing
@@ -115,13 +132,13 @@ export default function VideoPlayer({
     const media = mediaRef.current
     if (!media) return
     if (media.paused) {
-      media.play()
+      void media.play()
       setPlaying(true)
-      onPlay()
+      void onPlay()
     } else {
       media.pause()
       setPlaying(false)
-      onPause()
+      void onPause()
     }
   }, [mediaRef, onPause, onPlay])
 
@@ -167,6 +184,14 @@ export default function VideoPlayer({
   const skip = useCallback((seconds: number) => {
     handleSeek(Math.max(0, Math.min(duration, currentTime + seconds)))
   }, [currentTime, duration, handleSeek])
+
+  const toggleSequentialPlayback = useCallback(() => {
+    onPlaybackModeChange(playbackMode === 'sequential' ? 'none' : 'sequential')
+  }, [onPlaybackModeChange, playbackMode])
+
+  const toggleShufflePlayback = useCallback(() => {
+    onPlaybackModeChange(playbackMode === 'shuffle' ? 'none' : 'shuffle')
+  }, [onPlaybackModeChange, playbackMode])
 
   const clearHideControlsTimer = useCallback(() => {
     if (hideControlsTimer.current) {
@@ -239,7 +264,7 @@ export default function VideoPlayer({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
 
       switch (e.key) {
         case ' ':
@@ -284,6 +309,13 @@ export default function VideoPlayer({
   }, [mediaRef, videoUrl, volume])
 
   useEffect(() => {
+    const media = mediaRef.current
+    if (!media || !videoUrl) return
+    media.defaultPlaybackRate = playbackRate
+    media.playbackRate = playbackRate
+  }, [mediaRef, playbackRate, videoUrl])
+
+  useEffect(() => {
     setCurrentTime(0)
     setDuration(0)
     setVideoAspectRatio(null)
@@ -294,6 +326,24 @@ export default function VideoPlayer({
     setShowHeatmap(defaultShowHeatmap)
     setShowTimeline(defaultShowTimeline)
   }, [videoUrl, subtitleCues, defaultShowHeatmap, defaultShowTimeline])
+
+  useEffect(() => {
+    if (!videoUrl) return
+    if (autoPlayRequestId === 0 || handledAutoPlayRequest.current === autoPlayRequestId) {
+      return
+    }
+
+    const media = mediaRef.current
+    if (!media) return
+
+    handledAutoPlayRequest.current = autoPlayRequestId
+
+    const frame = requestAnimationFrame(() => {
+      void media.play()
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [autoPlayRequestId, mediaRef, videoUrl])
 
   return (
     <div
@@ -316,9 +366,13 @@ export default function VideoPlayer({
                   const media = mediaRef.current
                   if (media) setDuration(media.duration)
                 }}
-                onPlay={() => { setPlaying(true); onPlay() }}
-                onPause={() => { setPlaying(false); onPause() }}
-                onEnded={() => setPlaying(false)}
+                onPlay={() => { setPlaying(true); void onPlay() }}
+                onPause={() => { setPlaying(false); void onPause() }}
+                onEnded={() => {
+                  setPlaying(false)
+                  void onPause()
+                  void onEnded()
+                }}
               />
               <div className="flex flex-col items-center justify-center gap-4 text-center px-6">
                 {artworkUrl ? (
@@ -360,9 +414,13 @@ export default function VideoPlayer({
                   }
                 }
               }}
-              onPlay={() => { setPlaying(true); onPlay() }}
-              onPause={() => { setPlaying(false); onPause() }}
-              onEnded={() => setPlaying(false)}
+              onPlay={() => { setPlaying(true); void onPlay() }}
+              onPause={() => { setPlaying(false); void onPause() }}
+              onEnded={() => {
+                setPlaying(false)
+                void onPause()
+                void onEnded()
+              }}
             />
           )
         ) : (
@@ -552,6 +610,36 @@ export default function VideoPlayer({
               onClick={(e) => e.stopPropagation()}
               className="w-20 h-1"
             />
+            <select
+              value={playbackRate.toString()}
+              onChange={(e) => {
+                e.stopPropagation()
+                onPlaybackRateChange(parseFloat(e.target.value))
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-surface-300/80 text-text-secondary text-[10px] px-2 py-1 rounded border border-surface-100/30 outline-none hover:text-text-primary"
+              title={t('player.playbackSpeed')}
+            >
+              {PLAYBACK_RATE_OPTIONS.map((rate) => (
+                <option key={rate} value={rate}>
+                  {formatPlaybackRate(rate)}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleSequentialPlayback() }}
+              className={`p-1.5 rounded transition-colors ${playbackMode === 'sequential' ? 'text-accent bg-accent/10' : 'text-text-secondary hover:text-text-primary'}`}
+              title={t('player.continuousPlayback')}
+            >
+              <Repeat size={16} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleShufflePlayback() }}
+              className={`p-1.5 rounded transition-colors ${playbackMode === 'shuffle' ? 'text-accent bg-accent/10' : 'text-text-secondary hover:text-text-primary'}`}
+              title={t('player.shufflePlayback')}
+            >
+              <Shuffle size={16} />
+            </button>
             {actions.length > 0 && (
               <>
                 <button
@@ -613,6 +701,13 @@ function formatTime(seconds: number): string {
     return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function formatPlaybackRate(rate: number): string {
+  const formatted = Number.isInteger(rate)
+    ? rate.toFixed(0)
+    : rate.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+  return `${formatted}x`
 }
 
 function getVideoClassName({

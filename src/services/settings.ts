@@ -18,6 +18,7 @@ export interface AppSettings {
   // Device
   strokeRangeMin: number // 0-100
   strokeRangeMax: number // 0-100
+  invertStroke: boolean
   timeOffset: number // ms, -500 to 500
 }
 
@@ -34,6 +35,7 @@ export const defaultSettings: AppSettings = {
   speedColors: true,
   strokeRangeMin: 0,
   strokeRangeMax: 100,
+  invertStroke: false,
   timeOffset: 0,
 }
 
