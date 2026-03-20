@@ -16,6 +16,10 @@
 
 ## 스크린샷
 
+| v0.1.4 미리보기 | 디바이스 설정 |
+|:-:|:-:|
+| ![v0.1.4 미리보기](screenshots/preview_v014.png) | ![디바이스 설정](screenshots/device_settings_v014.png) |
+
 | 오디오 재생 + 히트맵 | 오디오 재생 |
 |:-:|:-:|
 | ![오디오 재생 + 히트맵](screenshots/VOICE_HM_TL.png) | ![오디오 재생](screenshots/VOICE_ASMR.png) |

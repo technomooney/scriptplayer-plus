@@ -16,6 +16,10 @@
 
 ## 截图
 
+| v0.1.4 预览 | 设备设置 |
+|:-:|:-:|
+| ![v0.1.4 预览](screenshots/preview_v014.png) | ![设备设置](screenshots/device_settings_v014.png) |
+
 | 音频播放 + 热力图 | 音频播放 |
 |:-:|:-:|
 | ![音频播放 + 热力图](screenshots/VOICE_HM_TL.png) | ![音频播放](screenshots/VOICE_ASMR.png) |

@@ -16,6 +16,10 @@
 
 ## スクリーンショット
 
+| v0.1.4 プレビュー | デバイス設定 |
+|:-:|:-:|
+| ![v0.1.4 プレビュー](screenshots/preview_v014.png) | ![デバイス設定](screenshots/device_settings_v014.png) |
+
 | オーディオ再生 + ヒートマップ | オーディオ再生 |
 |:-:|:-:|
 | ![オーディオ再生 + ヒートマップ](screenshots/VOICE_HM_TL.png) | ![オーディオ再生](screenshots/VOICE_ASMR.png) |

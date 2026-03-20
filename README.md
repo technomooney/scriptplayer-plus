@@ -16,6 +16,10 @@
 
 ## Screenshots
 
+| v0.1.4 Preview | Device Settings |
+|:-:|:-:|
+| ![v0.1.4 Preview](docs/screenshots/preview_v014.png) | ![Device Settings](docs/screenshots/device_settings_v014.png) |
+
 | Audio Playback + Heatmap | Audio Playback |
 |:-:|:-:|
 | ![Audio Playback + Heatmap](docs/screenshots/VOICE_HM_TL.png) | ![Audio Playback](docs/screenshots/VOICE_ASMR.png) |
