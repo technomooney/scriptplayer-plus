@@ -136,7 +136,10 @@ npm run build:mac
 
 ## License
 
-MIT
+PolyForm-Noncommercial-1.0.0
+
+This project is distributed as source-available software for noncommercial use only.
+Commercial use requires separate permission from the copyright holder.
 
 ---
 
