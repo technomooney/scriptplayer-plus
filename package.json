@@ -1,6 +1,6 @@
 {
   "name": "scriptplayer-plus",
-  "version": "0.1.5-exp.2",
+  "version": "0.1.5-exp.3",
   "description": "ScriptPlayer+ - Funscript video player with Handy and Intiface support",
   "license": "PolyForm-Noncommercial-1.0.0",
   "main": "dist-electron/main.js",
@@ -13,9 +13,10 @@
     "build:all": "vite build && electron-builder --win --mac"
   },
   "dependencies": {
+    "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "lucide-react": "^0.460.0"
+    "serialport": "^13.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -37,6 +38,9 @@
     "appId": "com.scriptplayerplus.app",
     "productName": "ScriptPlayerPlus",
     "icon": "public/icon.png",
+    "asarUnpack": [
+      "node_modules/@serialport/**/*"
+    ],
     "directories": {
       "output": "release"
     },
@@ -48,7 +52,9 @@
       "target": [
         {
           "target": "dir",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "public/icon.ico",
@@ -58,7 +64,10 @@
       "target": [
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "public/icon.icns",
@@ -66,8 +75,16 @@
     },
     "dmg": {
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "portable": {

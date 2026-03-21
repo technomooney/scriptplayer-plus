@@ -27,6 +27,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readSubtitles: (mediaPath: string) => ipcRenderer.invoke('fs:readSubtitles', mediaPath),
   readSubtitleFile: (filePath: string) => ipcRenderer.invoke('fs:readSubtitleFile', filePath),
 
+  // Direct serial / COM port
+  osrSerialListPorts: () => ipcRenderer.invoke('osrSerial:listPorts'),
+  osrSerialGetState: () => ipcRenderer.invoke('osrSerial:getState'),
+  osrSerialConnect: (path: string, baudRate?: number) => ipcRenderer.invoke('osrSerial:connect', path, baudRate),
+  osrSerialDisconnect: () => ipcRenderer.invoke('osrSerial:disconnect'),
+  osrSerialWrite: (command: string) => ipcRenderer.invoke('osrSerial:write', command),
+  osrSerialOnStateChange: (listener: (state: any) => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, state: any) => listener(state)
+    ipcRenderer.on('osrSerial:stateChanged', wrapped)
+    return () => {
+      ipcRenderer.removeListener('osrSerial:stateChanged', wrapped)
+    }
+  },
+
   // NAS operations
   nasWebdavConnect: (url: string, username: string, password: string) =>
     ipcRenderer.invoke('nas:webdav:connect', url, username, password),

@@ -8,6 +8,8 @@ import {
   FunscriptAction,
   FunscriptBundle,
   MediaType,
+  OsrSerialConnectionState,
+  OsrSerialPortInfo,
   PlaybackMode,
   ScriptAxisId,
   SubtitleCue,
@@ -21,6 +23,7 @@ import {
   ButtplugDevice,
   buttplugService,
 } from './services/buttplug'
+import { osrSerialService } from './services/osrSerial'
 import {
   AxisActionMap,
   buildButtplugDeviceSignature,
@@ -29,6 +32,11 @@ import {
   ButtplugFeatureMapping,
   getButtplugFeatureStorageKey,
 } from './services/buttplugDeviceControl'
+import {
+  buildDefaultTCodeCommand,
+  buildTCodeCommand,
+  OSR_SERIAL_AXIS_ORDER,
+} from './services/tcode'
 import {
   normalizeScriptBundle,
   SCRIPT_AXIS_IDS,
@@ -45,9 +53,13 @@ const DEVICE_PROVIDER_STORAGE_KEY = 'scriptplayer-device-provider'
 const BUTTPLUG_SERVER_URL_STORAGE_KEY = 'scriptplayer-buttplug-url'
 const BUTTPLUG_DEVICE_INDEX_STORAGE_KEY = 'scriptplayer-buttplug-device-index'
 const BUTTPLUG_FEATURE_MAPPINGS_STORAGE_KEY = 'scriptplayer-buttplug-feature-mappings-v1'
+const OSR_SERIAL_PORT_PATH_STORAGE_KEY = 'scriptplayer-osr-serial-port-path'
+const OSR_SERIAL_UPDATE_RATE_STORAGE_KEY = 'scriptplayer-osr-serial-update-rate'
 const DEFAULT_BUTTPLUG_SERVER_URL = 'ws://127.0.0.1:12345'
+const DEFAULT_OSR_SERIAL_BAUD_RATE = 115200
+const DEFAULT_OSR_SERIAL_UPDATE_RATE = 50
 
-type DeviceProvider = 'handy' | 'buttplug'
+type DeviceProvider = 'handy' | 'buttplug' | 'serial'
 type StoredButtplugFeatureMapping = ButtplugFeatureMapping
 
 function getMediaTypeFromPath(filePath: string): MediaType | null {
@@ -86,7 +98,7 @@ function loadPlaybackRate(): number {
 function loadDeviceProvider(): DeviceProvider {
   try {
     const stored = localStorage.getItem(DEVICE_PROVIDER_STORAGE_KEY)
-    if (stored === 'handy' || stored === 'buttplug') {
+    if (stored === 'handy' || stored === 'buttplug' || stored === 'serial') {
       return stored
     }
   } catch {
@@ -124,6 +136,27 @@ function loadButtplugFeatureMappings(): Record<string, StoredButtplugFeatureMapp
   } catch {
     return {}
   }
+}
+
+function loadOsrSerialPortPath(): string {
+  try {
+    return localStorage.getItem(OSR_SERIAL_PORT_PATH_STORAGE_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+function loadOsrSerialUpdateRate(): number {
+  try {
+    const stored = Number(localStorage.getItem(OSR_SERIAL_UPDATE_RATE_STORAGE_KEY))
+    if (Number.isFinite(stored) && stored >= 5 && stored <= 200) {
+      return Math.round(stored)
+    }
+  } catch {
+    // Ignore storage failures
+  }
+
+  return DEFAULT_OSR_SERIAL_UPDATE_RATE
 }
 
 function getPlaybackTimeScale(playbackRate: number): number {
@@ -234,6 +267,11 @@ export default function App() {
   const [buttplugServerUrl, setButtplugServerUrlState] = useState<string>(loadButtplugServerUrl)
   const [selectedButtplugDeviceIndex, setSelectedButtplugDeviceIndexState] = useState<number | null>(loadButtplugDeviceIndex)
   const [buttplugFeatureMappingStore, setButtplugFeatureMappingStore] = useState<Record<string, StoredButtplugFeatureMapping>>(loadButtplugFeatureMappings)
+  const [osrSerialConnectionState, setOsrSerialConnectionState] = useState<OsrSerialConnectionState>('disconnected')
+  const [osrSerialError, setOsrSerialError] = useState<string | null>(null)
+  const [osrSerialPorts, setOsrSerialPorts] = useState<OsrSerialPortInfo[]>([])
+  const [selectedOsrSerialPortPath, setSelectedOsrSerialPortPathState] = useState<string>(loadOsrSerialPortPath)
+  const [osrSerialUpdateRate, setOsrSerialUpdateRateState] = useState<number>(loadOsrSerialUpdateRate)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
   const [manualScriptPaths, setManualScriptPaths] = useState<Record<string, string>>({})
@@ -245,6 +283,8 @@ export default function App() {
   const handyUploadRequestId = useRef(0)
   const buttplugStreamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const buttplugStreamRunId = useRef(0)
+  const osrSerialStreamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const osrSerialStreamRunId = useRef(0)
 
   const primaryAxis = useMemo(() => getPrimaryAxis(funscriptBundle), [funscriptBundle])
   const displayAxisActions = useMemo(
@@ -289,13 +329,22 @@ export default function App() {
     [files, manualScriptPaths, manualSubtitleFiles]
   )
   const buttplugConnected = buttplugConnectionState === 'connected'
+  const osrSerialConnected = osrSerialConnectionState === 'connected'
   const selectedButtplugDevice = useMemo(
     () => buttplugDevices.find((device) => device.index === selectedButtplugDeviceIndex) ?? null,
     [buttplugDevices, selectedButtplugDeviceIndex]
   )
+  const selectedOsrSerialPort = useMemo(
+    () => osrSerialPorts.find((port) => port.path === selectedOsrSerialPortPath) ?? null,
+    [osrSerialPorts, selectedOsrSerialPortPath]
+  )
   const selectedButtplugFeatureMappings = useMemo(
     () => buildFeatureMappingsForDevice(selectedButtplugDevice, buttplugFeatureMappingStore),
     [buttplugFeatureMappingStore, selectedButtplugDevice]
+  )
+  const availableOsrSerialAxes = useMemo(
+    () => OSR_SERIAL_AXIS_ORDER.filter((axisId) => Boolean(displayAxisActions[axisId]?.length)),
+    [displayAxisActions]
   )
 
   useEffect(() => {
@@ -323,6 +372,33 @@ export default function App() {
       buttplugService.onConnectionChange = null
       buttplugService.onDevicesChange = null
       buttplugService.onScanChange = null
+    }
+  }, [])
+
+  useEffect(() => {
+    osrSerialService.onStateChange = (state) => {
+      setOsrSerialConnectionState(state.connectionState)
+      setOsrSerialError(state.error)
+      if (state.connectedPortPath) {
+        setSelectedOsrSerialPortPathState(state.connectedPortPath)
+      }
+    }
+    osrSerialService.onPortsChange = (ports) => {
+      setOsrSerialPorts(ports)
+    }
+
+    void osrSerialService.initialize().then(() => {
+      setOsrSerialConnectionState(osrSerialService.connectionState)
+      setOsrSerialError(osrSerialService.error)
+      if (osrSerialService.connectedPortPath) {
+        setSelectedOsrSerialPortPathState(osrSerialService.connectedPortPath)
+      }
+      return osrSerialService.refreshPorts()
+    })
+
+    return () => {
+      osrSerialService.onStateChange = null
+      osrSerialService.onPortsChange = null
     }
   }, [])
 
@@ -378,6 +454,25 @@ export default function App() {
     }
   }, [])
 
+  const setSelectedOsrSerialPortPath = useCallback((portPath: string) => {
+    setSelectedOsrSerialPortPathState(portPath)
+    try {
+      localStorage.setItem(OSR_SERIAL_PORT_PATH_STORAGE_KEY, portPath)
+    } catch {
+      // Ignore storage failures
+    }
+  }, [])
+
+  const setOsrSerialUpdateRate = useCallback((rate: number) => {
+    const normalizedRate = Math.max(5, Math.min(200, Math.round(rate || DEFAULT_OSR_SERIAL_UPDATE_RATE)))
+    setOsrSerialUpdateRateState(normalizedRate)
+    try {
+      localStorage.setItem(OSR_SERIAL_UPDATE_RATE_STORAGE_KEY, normalizedRate.toString())
+    } catch {
+      // Ignore storage failures
+    }
+  }, [])
+
   const setSelectedButtplugDeviceIndex = useCallback((deviceIndex: number | null) => {
     setSelectedButtplugDeviceIndexState(deviceIndex)
     try {
@@ -406,6 +501,12 @@ export default function App() {
     if (!buttplugStreamTimer.current) return
     clearTimeout(buttplugStreamTimer.current)
     buttplugStreamTimer.current = null
+  }, [])
+
+  const clearOsrSerialStreamTimer = useCallback(() => {
+    if (!osrSerialStreamTimer.current) return
+    clearTimeout(osrSerialStreamTimer.current)
+    osrSerialStreamTimer.current = null
   }, [])
 
   const stopButtplugPlayback = useCallback(
@@ -480,6 +581,71 @@ export default function App() {
     settings.timeOffset,
   ])
 
+  const stopOsrSerialPlayback = useCallback(async (options?: { homeDevice?: boolean }) => {
+    osrSerialStreamRunId.current += 1
+    clearOsrSerialStreamTimer()
+
+    if (!options?.homeDevice || !osrSerialConnected) {
+      return
+    }
+
+    const neutralCommand = buildDefaultTCodeCommand(OSR_SERIAL_AXIS_ORDER)
+    if (neutralCommand) {
+      await osrSerialService.writeCommand(neutralCommand)
+    }
+  }, [clearOsrSerialStreamTimer, osrSerialConnected])
+
+  const startOsrSerialPlayback = useCallback(async () => {
+    const media = mediaRef.current
+    if (
+      !media
+      || media.paused
+      || deviceProvider !== 'serial'
+      || !osrSerialConnected
+      || availableOsrSerialAxes.length === 0
+    ) {
+      return
+    }
+
+    const runId = ++osrSerialStreamRunId.current
+    clearOsrSerialStreamTimer()
+
+    const tick = async () => {
+      if (runId !== osrSerialStreamRunId.current) return
+
+      const currentMedia = mediaRef.current
+      if (!currentMedia || currentMedia.paused) return
+
+      const intervalMs = Math.max(5, Math.round(1000 / Math.max(1, osrSerialUpdateRate)))
+      const effectivePlaybackRate = currentMedia.playbackRate > 0 ? currentMedia.playbackRate : playbackRate
+      const currentTimeMs = currentMedia.currentTime * 1000 + (settings.timeOffset || 0)
+      const targetTimeMs = currentTimeMs + intervalMs * effectivePlaybackRate
+      const command = buildTCodeCommand(runtimeAxisActions, targetTimeMs, {
+        axisIds: OSR_SERIAL_AXIS_ORDER,
+      })
+
+      if (command) {
+        await osrSerialService.writeCommand(command)
+      }
+
+      if (runId !== osrSerialStreamRunId.current) return
+      osrSerialStreamTimer.current = setTimeout(() => {
+        void tick()
+      }, intervalMs)
+    }
+
+    await tick()
+  }, [
+    availableOsrSerialAxes.length,
+    clearOsrSerialStreamTimer,
+    deviceProvider,
+    osrSerialConnected,
+    osrSerialUpdateRate,
+    playbackRate,
+    runtimeAxisActions,
+    settings.timeOffset,
+  ])
+
   const loadSubtitleCues = useCallback(async (mediaPath: string, mediaType: MediaType) => {
     const manualSubtitle = manualSubtitleFiles[mediaPath]
     if (manualSubtitle) {
@@ -519,6 +685,10 @@ export default function App() {
       await stopButtplugPlayback({ stopDevice: true })
     }
 
+    if (osrSerialConnected) {
+      await stopOsrSerialPlayback({ homeDevice: true })
+    }
+
     const currentMedia = mediaRef.current
     if (currentMedia && !currentMedia.paused) {
       currentMedia.pause()
@@ -552,7 +722,7 @@ export default function App() {
       const nextArtworkUrl = await window.electronAPI.getVideoUrl(artworkPath)
       setArtworkUrl(nextArtworkUrl)
     }
-  }, [loadScriptBundle, loadSubtitleCues, stopButtplugPlayback])
+  }, [loadScriptBundle, loadSubtitleCues, osrSerialConnected, stopButtplugPlayback, stopOsrSerialPlayback])
 
   const handleFileSelect = useCallback(async (file: VideoFile) => {
     await openMediaFile(file.path, file.type)
@@ -640,6 +810,27 @@ export default function App() {
     await buttplugService.refreshDevices()
   }
 
+  const handleOsrSerialRefresh = async () => {
+    await osrSerialService.refreshPorts()
+  }
+
+  const handleOsrSerialConnect = async (portPath: string) => {
+    const trimmedPath = portPath.trim()
+    setSelectedOsrSerialPortPath(trimmedPath)
+    if (!trimmedPath) {
+      setOsrSerialError('Select a serial port.')
+      setOsrSerialConnectionState('error')
+      return
+    }
+
+    await osrSerialService.connect(trimmedPath, DEFAULT_OSR_SERIAL_BAUD_RATE)
+  }
+
+  const handleOsrSerialDisconnect = async () => {
+    await stopOsrSerialPlayback({ homeDevice: true })
+    await osrSerialService.disconnect()
+  }
+
   const syncHandyPlayback = useCallback(async (mediaTimeSeconds: number) => {
     if (!handyService.isConnected || !scriptUploadUrl) return
     const startTime = getHandyStartTime(mediaTimeSeconds, playbackRate, settings.timeOffset || 0)
@@ -656,8 +847,13 @@ export default function App() {
 
     if (deviceProvider === 'buttplug') {
       await startButtplugPlayback()
+      return
     }
-  }, [deviceProvider, startButtplugPlayback, syncHandyPlayback])
+
+    if (deviceProvider === 'serial') {
+      await startOsrSerialPlayback()
+    }
+  }, [deviceProvider, startButtplugPlayback, startOsrSerialPlayback, syncHandyPlayback])
 
   const handlePause = useCallback(async () => {
     if (deviceProvider === 'handy' && handyService.isConnected) {
@@ -667,8 +863,13 @@ export default function App() {
 
     if (deviceProvider === 'buttplug' && buttplugService.isConnected) {
       await stopButtplugPlayback({ stopDevice: true })
+      return
     }
-  }, [deviceProvider, stopButtplugPlayback])
+
+    if (deviceProvider === 'serial' && osrSerialConnected) {
+      await stopOsrSerialPlayback({ homeDevice: true })
+    }
+  }, [deviceProvider, osrSerialConnected, stopButtplugPlayback, stopOsrSerialPlayback])
 
   const handleSeek = useCallback(
     async (time: number) => {
@@ -686,9 +887,17 @@ export default function App() {
         if (media && !media.paused) {
           await startButtplugPlayback()
         }
+        return
+      }
+
+      if (deviceProvider === 'serial' && osrSerialConnected) {
+        const media = mediaRef.current
+        if (media && !media.paused) {
+          await startOsrSerialPlayback()
+        }
       }
     },
-    [deviceProvider, scriptUploadUrl, startButtplugPlayback, syncHandyPlayback]
+    [deviceProvider, osrSerialConnected, scriptUploadUrl, startButtplugPlayback, startOsrSerialPlayback, syncHandyPlayback]
   )
 
   const handleTimeUpdate = useCallback((_time: number) => {}, [])
@@ -795,23 +1004,72 @@ export default function App() {
   }, [buttplugDevices, selectedButtplugDeviceIndex, setSelectedButtplugDeviceIndex])
 
   useEffect(() => {
+    if (osrSerialPorts.length === 0) {
+      if (selectedOsrSerialPortPath) {
+        setSelectedOsrSerialPortPath('')
+      }
+      return
+    }
+
+    if (selectedOsrSerialPortPath && osrSerialPorts.some((port) => port.path === selectedOsrSerialPortPath)) {
+      return
+    }
+
+    setSelectedOsrSerialPortPath(osrSerialPorts[0].path)
+  }, [osrSerialPorts, selectedOsrSerialPortPath, setSelectedOsrSerialPortPath])
+
+  useEffect(() => {
+    if (deviceProvider === 'serial') {
+      void osrSerialService.refreshPorts()
+    }
+  }, [deviceProvider])
+
+  useEffect(() => {
     if (deviceProvider === 'handy') {
       void stopButtplugPlayback({ stopDevice: true }).then(() => {
         if (buttplugService.isConnected) {
           void buttplugService.disconnect()
         }
       })
+      void stopOsrSerialPlayback({ homeDevice: osrSerialConnected }).then(() => {
+        if (osrSerialConnected) {
+          void osrSerialService.disconnect()
+        }
+      })
       return
     }
 
-    if (deviceProvider === 'buttplug' && handyService.isConnected) {
-      void handyService.hsspStop().finally(() => {
-        handyService.disconnect()
-        setHandyConnected(false)
-        setScriptUploadUrl(null)
+    if (deviceProvider === 'buttplug') {
+      if (handyService.isConnected) {
+        void handyService.hsspStop().finally(() => {
+          handyService.disconnect()
+          setHandyConnected(false)
+          setScriptUploadUrl(null)
+        })
+      }
+      void stopOsrSerialPlayback({ homeDevice: osrSerialConnected }).then(() => {
+        if (osrSerialConnected) {
+          void osrSerialService.disconnect()
+        }
       })
+      return
     }
-  }, [deviceProvider, stopButtplugPlayback])
+
+    if (deviceProvider === 'serial') {
+      void stopButtplugPlayback({ stopDevice: true }).then(() => {
+        if (buttplugService.isConnected) {
+          void buttplugService.disconnect()
+        }
+      })
+      if (handyService.isConnected) {
+        void handyService.hsspStop().finally(() => {
+          handyService.disconnect()
+          setHandyConnected(false)
+          setScriptUploadUrl(null)
+        })
+      }
+    }
+  }, [deviceProvider, osrSerialConnected, stopButtplugPlayback, stopOsrSerialPlayback])
 
   useEffect(() => {
     if (
@@ -838,11 +1096,35 @@ export default function App() {
   ])
 
   useEffect(() => {
+    if (
+      deviceProvider !== 'serial'
+      || !osrSerialConnected
+      || availableOsrSerialAxes.length === 0
+    ) {
+      void stopOsrSerialPlayback({ homeDevice: osrSerialConnected })
+      return
+    }
+
+    const media = mediaRef.current
+    if (!media || media.paused) return
+    void startOsrSerialPlayback()
+  }, [
+    availableOsrSerialAxes.length,
+    deviceProvider,
+    osrSerialConnected,
+    osrSerialUpdateRate,
+    startOsrSerialPlayback,
+    stopOsrSerialPlayback,
+  ])
+
+  useEffect(() => {
     return () => {
       void stopButtplugPlayback({ stopDevice: true })
       void buttplugService.disconnect()
+      void stopOsrSerialPlayback({ homeDevice: osrSerialConnected })
+      void osrSerialService.disconnect()
     }
-  }, [stopButtplugPlayback])
+  }, [stopButtplugPlayback, stopOsrSerialPlayback])
 
   const deviceInfo = useMemo(() => {
     if (deviceProvider === 'handy') {
@@ -853,6 +1135,16 @@ export default function App() {
         detail: handyConnected && handyService.ping !== null ? `${handyService.ping}ms` : null,
         statusText: uploadState?.text ?? null,
         statusTone: uploadState?.tone ?? null,
+      }
+    }
+
+    if (deviceProvider === 'serial') {
+      return {
+        connected: osrSerialConnected,
+        label: selectedOsrSerialPort ? selectedOsrSerialPort.path : 'Direct Serial',
+        detail: `${DEFAULT_OSR_SERIAL_BAUD_RATE} baud / ${osrSerialUpdateRate}Hz`,
+        statusText: osrSerialError || (!selectedOsrSerialPort && osrSerialPorts.length > 0 ? 'Select a serial port.' : null),
+        statusTone: osrSerialError ? 'error' as const : null,
       }
     }
 
@@ -876,7 +1168,12 @@ export default function App() {
     deviceProvider,
     handyConnected,
     handyUploadStatus,
+    osrSerialConnected,
+    osrSerialError,
+    osrSerialPorts.length,
+    osrSerialUpdateRate,
     selectedButtplugDevice,
+    selectedOsrSerialPort,
   ])
 
   return (
@@ -899,6 +1196,17 @@ export default function App() {
           handyConnected={handyConnected}
           onHandyConnect={handleHandyConnect}
           onHandyDisconnect={handleHandyDisconnect}
+          osrSerialConnected={osrSerialConnected}
+          osrSerialConnecting={osrSerialConnectionState === 'connecting'}
+          osrSerialPorts={osrSerialPorts}
+          selectedOsrSerialPortPath={selectedOsrSerialPortPath}
+          onOsrSerialPortSelect={setSelectedOsrSerialPortPath}
+          onOsrSerialRefresh={handleOsrSerialRefresh}
+          onOsrSerialConnect={handleOsrSerialConnect}
+          onOsrSerialDisconnect={handleOsrSerialDisconnect}
+          osrSerialError={osrSerialError}
+          osrSerialUpdateRate={osrSerialUpdateRate}
+          onOsrSerialUpdateRateChange={setOsrSerialUpdateRate}
           buttplugConnected={buttplugConnected}
           buttplugConnecting={buttplugConnectionState === 'connecting'}
           buttplugDevices={buttplugDevices}

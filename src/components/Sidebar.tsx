@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { FolderOpen, Film, FileCheck, Search, RefreshCw, Wifi, WifiOff, Folder, ChevronDown, ChevronRight, Clock, X, Zap, Music4, Captions } from 'lucide-react'
-import { ScriptAxisId, VideoFile } from '../types'
+import { OsrSerialPortInfo, ScriptAxisId, VideoFile } from '../types'
 import { ButtplugDevice, ButtplugFeature } from '../services/buttplug'
 import { getScriptAxisDefinition } from '../services/multiaxis'
 import { useTranslation } from '../i18n'
 import EroScriptsPanel from './EroScriptsPanel'
 
-type DeviceProvider = 'handy' | 'buttplug'
+type DeviceProvider = 'handy' | 'buttplug' | 'serial'
 
 interface HandyHistoryEntry {
   key: string
@@ -61,6 +61,17 @@ interface SidebarProps {
   handyConnected: boolean
   onHandyConnect: (key: string) => void | Promise<void>
   onHandyDisconnect: () => void | Promise<void>
+  osrSerialConnected: boolean
+  osrSerialConnecting: boolean
+  osrSerialPorts: OsrSerialPortInfo[]
+  selectedOsrSerialPortPath: string
+  onOsrSerialPortSelect: (portPath: string) => void
+  onOsrSerialRefresh: () => void | Promise<void>
+  onOsrSerialConnect: (portPath: string) => void | Promise<void>
+  onOsrSerialDisconnect: () => void | Promise<void>
+  osrSerialError?: string | null
+  osrSerialUpdateRate: number
+  onOsrSerialUpdateRateChange: (rate: number) => void
   buttplugConnected: boolean
   buttplugConnecting: boolean
   buttplugDevices: ButtplugDevice[]
@@ -124,6 +135,17 @@ export default function Sidebar({
   handyConnected,
   onHandyConnect,
   onHandyDisconnect,
+  osrSerialConnected,
+  osrSerialConnecting,
+  osrSerialPorts,
+  selectedOsrSerialPortPath,
+  onOsrSerialPortSelect,
+  onOsrSerialRefresh,
+  onOsrSerialConnect,
+  onOsrSerialDisconnect,
+  osrSerialError,
+  osrSerialUpdateRate,
+  onOsrSerialUpdateRateChange,
   buttplugConnected,
   buttplugConnecting,
   buttplugDevices,
@@ -159,10 +181,16 @@ export default function Sidebar({
 
   const folderGroups = useMemo(() => groupByFolder(filteredFiles), [filteredFiles])
   const hasSubfolders = folderGroups.length > 1 || (folderGroups.length === 1 && folderGroups[0].folder !== '')
-  const activeDeviceConnected = deviceProvider === 'handy' ? handyConnected : buttplugConnected
+  const activeDeviceConnected = deviceProvider === 'handy'
+    ? handyConnected
+    : (deviceProvider === 'serial' ? osrSerialConnected : buttplugConnected)
   const selectedButtplugDevice = useMemo(
     () => buttplugDevices.find((device) => device.index === selectedButtplugDeviceIndex) ?? null,
     [buttplugDevices, selectedButtplugDeviceIndex]
+  )
+  const selectedOsrSerialPort = useMemo(
+    () => osrSerialPorts.find((port) => port.path === selectedOsrSerialPortPath) ?? null,
+    [osrSerialPorts, selectedOsrSerialPortPath]
   )
   const availableAxisOptions = useMemo(
     () => buttplugAvailableAxes.map((axisId) => ({
@@ -378,6 +406,7 @@ export default function Sidebar({
                 className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none"
               >
                 <option value="handy">{t('device.providerHandy')}</option>
+                <option value="serial">{t('device.providerSerial')}</option>
                 <option value="buttplug">{t('device.providerIntiface')}</option>
               </select>
             </div>
@@ -475,6 +504,126 @@ export default function Sidebar({
 
                 <p className="text-[10px] text-text-muted leading-relaxed">
                   {t('device.getKey')}
+                </p>
+              </>
+            ) : deviceProvider === 'serial' ? (
+              <>
+                <div>
+                  <h3 className="text-xs font-medium text-text-primary mb-2">{t('device.serial')}</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        osrSerialConnected ? 'bg-green-400' : 'bg-text-muted'
+                      }`}
+                    />
+                    <span className="text-xs text-text-secondary">
+                      {osrSerialConnected ? t('device.connected') : t('device.disconnected')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1.5">
+                      {t('device.serialPort')}
+                    </label>
+                    <select
+                      value={selectedOsrSerialPortPath}
+                      onChange={(event) => onOsrSerialPortSelect(event.target.value)}
+                      className="w-full bg-surface-300 text-text-primary text-xs px-3 py-2 rounded border border-surface-100/30 focus:border-accent/50 outline-none"
+                    >
+                      {osrSerialPorts.length === 0 ? (
+                        <option value="">{t('device.noSerialPorts')}</option>
+                      ) : (
+                        osrSerialPorts.map((port) => (
+                          <option key={port.path} value={port.path}>
+                            {port.displayName}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={onOsrSerialRefresh}
+                    className="self-end px-3 py-2 text-xs bg-surface-100/20 text-text-secondary hover:bg-surface-100/30 rounded transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCw size={12} />
+                    {t('device.refresh')}
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1.5">
+                    {t('device.updateRate')}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={5}
+                      max={200}
+                      step={1}
+                      value={osrSerialUpdateRate}
+                      onChange={(event) => onOsrSerialUpdateRateChange(Number(event.target.value))}
+                      className="flex-1"
+                    />
+                    <input
+                      type="number"
+                      min={5}
+                      max={200}
+                      step={1}
+                      value={osrSerialUpdateRate}
+                      onChange={(event) => onOsrSerialUpdateRateChange(Number(event.target.value))}
+                      className="w-20 bg-surface-300 text-text-primary text-xs px-2 py-1.5 rounded border border-surface-100/30 focus:border-accent/50 outline-none"
+                    />
+                    <span className="text-[10px] text-text-muted">Hz</span>
+                  </div>
+                </div>
+
+                {selectedOsrSerialPort && (
+                  <p className="text-[10px] text-text-muted leading-relaxed">
+                    {[
+                      selectedOsrSerialPort.manufacturer,
+                      selectedOsrSerialPort.serialNumber,
+                      selectedOsrSerialPort.vendorId && selectedOsrSerialPort.productId
+                        ? `${selectedOsrSerialPort.vendorId}:${selectedOsrSerialPort.productId}`
+                        : null,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+
+                {osrSerialConnected ? (
+                  <button
+                    onClick={onOsrSerialDisconnect}
+                    className="w-full py-2 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors"
+                  >
+                    {t('device.disconnect')}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onOsrSerialConnect(selectedOsrSerialPortPath)}
+                    disabled={osrSerialConnecting || !selectedOsrSerialPortPath}
+                    className="w-full py-2 text-xs bg-accent/10 text-accent hover:bg-accent/20 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {osrSerialConnecting ? (
+                      <>
+                        <RefreshCw size={12} className="animate-spin" />
+                        {t('device.connecting')}
+                      </>
+                    ) : (
+                      t('device.connect')
+                    )}
+                  </button>
+                )}
+
+                {osrSerialError && (
+                  <p className="text-[10px] text-red-400 leading-relaxed">
+                    {osrSerialError}
+                  </p>
+                )}
+
+                <p className="text-[10px] text-text-muted leading-relaxed">
+                  {t('device.serialHint')}
                 </p>
               </>
             ) : (

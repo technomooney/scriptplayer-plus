@@ -1,9 +1,13 @@
-import { FunscriptAction, ScriptAxisId } from '../types'
-import { getPositionAtTime } from './funscript'
+import { ScriptAxisId } from '../types'
 import { ButtplugDevice, ButtplugDeviceFrame, ButtplugFeature } from './buttplug'
-import { getDefaultAxisValue, SCRIPT_AXIS_IDS } from './multiaxis'
-
-export type AxisActionMap = Partial<Record<ScriptAxisId, FunscriptAction[]>>
+import { SCRIPT_AXIS_IDS } from './multiaxis'
+import {
+  applyAxisMappingValue,
+  AxisActionMap,
+  buildTCodeAxisCommand as formatTCodeAxisCommand,
+  getAxisValueAtTime,
+  TCODE_AXIS_ORDER,
+} from './tcode'
 
 export type ButtplugFeatureMapping = {
   axisId: ScriptAxisId | ''
@@ -15,7 +19,7 @@ export type ButtplugTransportCommand = {
   rawTCode: string | null
 }
 
-const TCODE_AXIS_ORDER: ScriptAxisId[] = ['L0', 'L1', 'L2', 'R0', 'R1', 'R2', 'V0', 'V1', 'A0', 'A1', 'A2']
+export type { AxisActionMap } from './tcode'
 
 export function buildButtplugDeviceSignature(device: ButtplugDevice): string {
   const featureSignature = device.features
@@ -95,20 +99,6 @@ export function buildButtplugTransportCommand(
     frame: buildButtplugFrame(device, mappings, actionMap, currentTimeMs, targetTimeMs, intervalMs),
     rawTCode: buildRawTCodeCommand(device, mappings, actionMap, targetTimeMs),
   }
-}
-
-function getAxisValueAtTime(axisId: ScriptAxisId, actionMap: AxisActionMap, timeMs: number): number {
-  const actions = actionMap[axisId]
-  if (!actions || actions.length === 0) {
-    return getDefaultAxisValue(axisId)
-  }
-
-  return getPositionAtTime(actions, timeMs) / 100
-}
-
-function applyAxisMappingValue(axisId: ScriptAxisId, value: number, invert: boolean): number {
-  const safeValue = Number.isFinite(value) ? value : getDefaultAxisValue(axisId)
-  return invert ? 1 - safeValue : safeValue
 }
 
 function buildButtplugFrame(
@@ -261,11 +251,5 @@ function deriveAxisInversionMap(
 }
 
 function buildTCodeAxisCommand(axisId: ScriptAxisId, value: number): string {
-  return `${axisId}${formatTCodeMagnitude(value)}`
-}
-
-function formatTCodeMagnitude(value: number): string {
-  const clamped = Math.max(0, Math.min(0.9999, Number.isFinite(value) ? value : 0))
-  const scaled = Math.min(9999, Math.max(0, Math.round(clamped * 10000)))
-  return scaled.toString().padStart(4, '0')
+  return formatTCodeAxisCommand(axisId, value)
 }

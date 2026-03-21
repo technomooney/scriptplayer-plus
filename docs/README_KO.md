@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  <b>The Handy</b> 연동, 실험적 <b>Intiface / Buttplug</b> 지원, <b>EroScripts</b> 브라우저 로그인, 다국어 지원을 갖춘 모던 펀스크립트 비디오 플레이어
+  <b>The Handy</b> 연동, 실험적 <b>Intiface / Buttplug / Direct Serial</b> 지원, <b>EroScripts</b> 브라우저 로그인, 다국어 지원을 갖춘 모던 펀스크립트 비디오 플레이어
 </p>
 
 <p align="center">
@@ -36,15 +36,15 @@
 |:-:|:-:|
 | ![설정](screenshots/setting_kor.png) | ![macOS](screenshots/macos.png) |
 
-## 실험판 v0.1.5-exp.2
+## 실험판 v0.1.5-exp.3
 
-`v0.1.5-exp.2` 프리릴리스는 Intiface가 인식한 호환 장치에 대해 실험적인 `Intiface / Buttplug` 다축 제어를 추가합니다. FUNSR 계열 SR1 / SR6 / PRO도 Intiface에서 정상 인식되면 이 경로로 테스트할 수 있습니다.
+`v0.1.5-exp.3` 프리릴리스는 TCode 호환 다축 장치를 위한 실험적인 `Direct Serial (COM)` provider를 추가합니다. OSR / FUNSR 계열 `L0/L1/L2/R0/R1/R2` 명령을 한 줄 TCode로 전송하고, 기존 `Intiface / Buttplug` 경로도 대안으로 유지합니다.
 
-| v0.1.5-exp.2 미리보기 |
+| v0.1.5-exp.3 미리보기 |
 |:-:|
-| ![v0.1.5-exp.2 미리보기](screenshots/preview_v015_exp1.png) |
+| ![v0.1.5-exp.3 미리보기](screenshots/preview_v015_exp1.png) |
 
-- 프리릴리스 다운로드: [ScriptPlayer+ v0.1.5-exp.2](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.2)
+- 프리릴리스 다운로드: [ScriptPlayer+ v0.1.5-exp.3](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.3)
 
 ## v0.1.4에서 추가된 내용
 
@@ -83,7 +83,7 @@
 
 1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 최신 `ScriptPlayerPlus-0.1.4-Windows-x64.zip` 다운로드
 2. 압축 해제 후 `ScriptPlayerPlus.exe` 실행 — 설치 불필요
-3. Intiface 실험 빌드는 [v0.1.5-exp.2 프리릴리스](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.2)에서 `ScriptPlayerPlus-0.1.5-exp.2-Windows-x64.zip` 다운로드
+3. Direct Serial / Intiface 실험 빌드는 [v0.1.5-exp.3 프리릴리스](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.3)에서 `ScriptPlayerPlus-0.1.5-exp.3-Windows-x64.zip` 다운로드
 
 ### macOS
 

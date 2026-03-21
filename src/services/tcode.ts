@@ -1,0 +1,61 @@
+import { FunscriptAction, ScriptAxisId } from '../types'
+import { getPositionAtTime } from './funscript'
+import { getDefaultAxisValue } from './multiaxis'
+
+export type AxisActionMap = Partial<Record<ScriptAxisId, FunscriptAction[]>>
+
+export const TCODE_AXIS_ORDER: ScriptAxisId[] = ['L0', 'L1', 'L2', 'R0', 'R1', 'R2', 'V0', 'V1', 'A0', 'A1', 'A2']
+export const OSR_SERIAL_AXIS_ORDER: ScriptAxisId[] = ['L0', 'L1', 'L2', 'R0', 'R1', 'R2']
+
+export function getAxisValueAtTime(axisId: ScriptAxisId, actionMap: AxisActionMap, timeMs: number): number {
+  const actions = actionMap[axisId]
+  if (!actions || actions.length === 0) {
+    return getDefaultAxisValue(axisId)
+  }
+
+  return getPositionAtTime(actions, timeMs) / 100
+}
+
+export function applyAxisMappingValue(axisId: ScriptAxisId, value: number, invert: boolean): number {
+  const safeValue = Number.isFinite(value) ? value : getDefaultAxisValue(axisId)
+  return invert ? 1 - safeValue : safeValue
+}
+
+export function formatTCodeMagnitude(value: number): string {
+  const clamped = Math.max(0, Math.min(0.9999, Number.isFinite(value) ? value : 0))
+  const scaled = Math.min(9999, Math.max(0, Math.round(clamped * 10000)))
+  return scaled.toString().padStart(4, '0')
+}
+
+export function buildTCodeAxisCommand(axisId: ScriptAxisId, value: number): string {
+  return `${axisId}${formatTCodeMagnitude(value)}`
+}
+
+export function buildTCodeCommand(
+  actionMap: AxisActionMap,
+  timeMs: number,
+  options?: {
+    axisIds?: ScriptAxisId[]
+    invertByAxis?: Partial<Record<ScriptAxisId, boolean>>
+  }
+): string | null {
+  const axisIds = options?.axisIds ?? TCODE_AXIS_ORDER
+  const invertByAxis = options?.invertByAxis ?? {}
+
+  if (axisIds.length === 0) return null
+
+  const segments = axisIds.map((axisId) => buildTCodeAxisCommand(
+    axisId,
+    applyAxisMappingValue(
+      axisId,
+      getAxisValueAtTime(axisId, actionMap, timeMs),
+      invertByAxis[axisId] ?? false
+    )
+  ))
+
+  return segments.length > 0 ? segments.join(' ') : null
+}
+
+export function buildDefaultTCodeCommand(axisIds: ScriptAxisId[] = TCODE_AXIS_ORDER): string | null {
+  return buildTCodeCommand({}, 0, { axisIds })
+}

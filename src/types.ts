@@ -67,6 +67,25 @@ export interface SubtitleFile {
   content: string
 }
 
+export type OsrSerialConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
+
+export interface OsrSerialPortInfo {
+  path: string
+  displayName: string
+  manufacturer: string | null
+  serialNumber: string | null
+  vendorId: string | null
+  productId: string | null
+  pnpId: string | null
+}
+
+export interface OsrSerialState {
+  connectionState: OsrSerialConnectionState
+  connectedPortPath: string | null
+  baudRate: number
+  error: string | null
+}
+
 declare global {
   interface Window {
     electronAPI: {
@@ -88,6 +107,14 @@ declare global {
       findArtwork: (mediaPath: string) => Promise<string | null>
       readSubtitles: (mediaPath: string) => Promise<SubtitleFile[]>
       readSubtitleFile: (filePath: string) => Promise<SubtitleFile | null>
+
+      // Direct serial / COM port
+      osrSerialListPorts: () => Promise<OsrSerialPortInfo[]>
+      osrSerialGetState: () => Promise<OsrSerialState>
+      osrSerialConnect: (path: string, baudRate?: number) => Promise<OsrSerialState>
+      osrSerialDisconnect: () => Promise<OsrSerialState>
+      osrSerialWrite: (command: string) => Promise<boolean>
+      osrSerialOnStateChange: (listener: (state: OsrSerialState) => void) => () => void
 
       // EroScripts
       eroscriptsCheckSession: () => Promise<{ loggedIn: boolean; username: string }>

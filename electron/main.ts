@@ -4,6 +4,7 @@ import fs from 'fs'
 import http from 'http'
 import https from 'https'
 import { URL } from 'url'
+import { OsrSerialManager } from './osrSerial'
 import { SCRIPT_AXIS_DEFINITIONS, inferAxisIdFromStem, stripKnownAxisSuffix } from '../src/services/multiaxis'
 import { getVideoSubtitleMatchScore, parseSubtitleFile } from '../src/services/subtitles'
 import { ScriptAxisId } from '../src/types'
@@ -47,6 +48,9 @@ let mainWindow: BrowserWindow | null = null
 const subtitleCandidateCache = new Map<string, string[]>()
 const subtitleAnalysisCache = new Map<string, { content: string; hasCues: boolean } | null>()
 const FUNSCRIPT_EXTS = ['.funscript', '.json']
+const osrSerialManager = new OsrSerialManager((state) => {
+  mainWindow?.webContents.send('osrSerial:stateChanged', state)
+})
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -71,6 +75,10 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  osrSerialManager.setNotifier((state) => {
+    mainWindow?.webContents.send('osrSerial:stateChanged', state)
+  })
 }
 
 app.whenReady().then(() => {
@@ -262,6 +270,30 @@ ipcMain.handle('fs:readSubtitleFile', async (_event, filePath: string) => {
   } catch {
     return null
   }
+})
+
+ipcMain.handle('osrSerial:listPorts', async () => {
+  try {
+    return await osrSerialManager.listPorts()
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle('osrSerial:getState', () => {
+  return osrSerialManager.getState()
+})
+
+ipcMain.handle('osrSerial:connect', async (_event, portPath: string, baudRate?: number) => {
+  return osrSerialManager.connect(portPath, baudRate)
+})
+
+ipcMain.handle('osrSerial:disconnect', async () => {
+  return osrSerialManager.disconnect()
+})
+
+ipcMain.handle('osrSerial:write', async (_event, command: string) => {
+  return osrSerialManager.write(command)
 })
 
 // ============================================================
@@ -935,6 +967,7 @@ function ensureProxyServer(): Promise<number> {
 
 // Clean up proxy on app quit
 app.on('before-quit', () => {
+  void osrSerialManager.dispose()
   if (proxyServer) {
     proxyServer.close()
     proxyServer = null
