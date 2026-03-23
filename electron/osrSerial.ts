@@ -1,9 +1,7 @@
-import { app } from 'electron'
 import { execFile } from 'child_process'
 import { SerialPortStream } from '@serialport/stream'
 import type { AutoDetectTypes } from '@serialport/bindings-cpp'
 import { createRequire } from 'module'
-import path from 'path'
 import { promisify } from 'util'
 import { OsrSerialPortInfo, OsrSerialState } from '../src/types'
 
@@ -229,19 +227,9 @@ function getSerialPortBinding(): SerialPortBinding {
     return cachedBinding
   }
 
-  const bindingsModule = app.isPackaged
-    ? runtimeRequire(
-        path.join(
-          process.resourcesPath,
-          'app.asar.unpacked',
-          'node_modules',
-          '@serialport',
-          'bindings-cpp',
-          'dist',
-          'index.js',
-        ),
-      )
-    : runtimeRequire('@serialport/bindings-cpp')
+  // Keep JS dependency resolution inside app.asar. Electron still resolves the
+  // unpacked native addon from the package when needed.
+  const bindingsModule = runtimeRequire('@serialport/bindings-cpp')
 
   cachedBinding = (bindingsModule as { autoDetect: () => SerialPortBinding }).autoDetect()
   return cachedBinding
