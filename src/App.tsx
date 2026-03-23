@@ -1179,12 +1179,22 @@ export default function App() {
 
   useEffect(() => {
     return () => {
-      void stopButtplugPlayback({ stopDevice: true })
+      buttplugStreamRunId.current += 1
+      if (buttplugStreamTimer.current) {
+        clearTimeout(buttplugStreamTimer.current)
+        buttplugStreamTimer.current = null
+      }
+
+      osrSerialStreamRunId.current += 1
+      if (osrSerialStreamTimer.current) {
+        clearTimeout(osrSerialStreamTimer.current)
+        osrSerialStreamTimer.current = null
+      }
+
       void buttplugService.disconnect()
-      void stopOsrSerialPlayback({ homeDevice: osrSerialConnected })
       void osrSerialService.disconnect()
     }
-  }, [stopButtplugPlayback, stopOsrSerialPlayback])
+  }, [])
 
   const deviceInfo = useMemo(() => {
     if (deviceProvider === 'handy') {
