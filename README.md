@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  A modern funscript video player with <b>The Handy</b> integration, experimental <b>Intiface / Buttplug / Direct Serial</b> support, <b>EroScripts</b> browser login, and multi-language support.
+  A modern funscript video player with <b>The Handy</b> integration, <b>Intiface / Buttplug / FunOSR</b> multi-axis support, <b>EroScripts</b> browser login, and multi-language support.
 </p>
 
 <p align="center">
@@ -36,22 +36,15 @@
 |:-:|:-:|
 | ![Settings](docs/screenshots/setting.png) | ![macOS](docs/screenshots/macos.png) |
 
-## Experimental v0.1.5-exp.4
+## What's New In v0.1.5
 
-The `v0.1.5-exp.4` prerelease focuses on TCode-compatible multi-axis devices with `Direct Serial (COM)` support, one-line `L0/L1/L2/R0/R1/R2` output, smoother timeline and heatmap playback updates, and improved Handy re-sync after timeline seeks.
+`v0.1.5` rolls the experimental multi-axis work into the main release with official `FunOSR (Direct Serial / COM)` support, `Intiface / Buttplug` raw TCode transport, adjustable one-line `L0/L1/L2/R0/R1/R2` output, smoother timeline and heatmap playback updates, better Handy re-sync after timeline seeks, and the packaged Windows fixes from `exp.7` / `exp.8`.
 
-| Experimental v0.1.5 Preview |
+| v0.1.5 Preview |
 |:-:|
-| ![Experimental v0.1.5 Preview](docs/screenshots/preview_v015_exp1.png) |
+| ![v0.1.5 Preview](docs/screenshots/preview_v015_exp1.png) |
 
-- Download the prerelease: [ScriptPlayer+ v0.1.5-exp.4](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.4)
-
-## What's New In v0.1.4
-
-- **Continuous Playback + Shuffle** — Move through the current folder automatically or pick a random next file when playback ends
-- **Playback Speed Control** — Switch between `0.5x` and `2.0x` directly in the player while keeping Handy timing aligned
-- **Real Handy Stroke Range Support** — Handy stroke min/max settings now transform the uploaded script instead of only changing the UI
-- **Inverse Stroke Mode** — Flip funscript positions before upload for alternate mounting or reversed motion setups
+- Download the stable release: [ScriptPlayer+ v0.1.5](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5)
 
 ## Features
 
@@ -68,6 +61,8 @@ The `v0.1.5-exp.4` prerelease focuses on TCode-compatible multi-axis devices wit
   - Time offset adjustment
   - Stroke range customization
   - Inverse stroke toggle
+- **Intiface / Buttplug Multi-Axis Support** — Connect supported devices, map features to script axes, and send raw TCode when available
+- **FunOSR (COM) Support** — Stream one-line TCode directly to compatible devices at an adjustable update rate
 - **EroScripts Integration** — Search and download funscripts directly from EroScripts via in-app browser login (no API key needed)
   - Session-based login persisted locally
   - Direct download into the configured script storage folder
@@ -81,13 +76,13 @@ The `v0.1.5-exp.4` prerelease focuses on TCode-compatible multi-axis devices wit
 
 ### Windows
 
-1. Download the latest `ScriptPlayerPlus-0.1.4-Windows-x64.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
+1. Download the latest Windows x64 build from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and run `ScriptPlayerPlus.exe` — no installation required
-3. For the experimental Direct Serial / Intiface build, download `ScriptPlayerPlus-0.1.5-exp.4-Windows-x64.zip` from [the v0.1.5-exp.4 prerelease](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.4)
+3. The main `v0.1.5` build includes The Handy, Intiface / Buttplug, and official FunOSR device support
 
 ### macOS
 
-1. Download `ScriptPlayerPlus-1.0.0-MacOS-Universal.zip` from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
+1. Download the latest macOS build from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and move `ScriptPlayerPlus.app` to Applications
 
 ### Build from Source

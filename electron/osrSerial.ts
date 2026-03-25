@@ -8,6 +8,7 @@ import { OsrSerialPortInfo, OsrSerialState } from '../src/types'
 const DEFAULT_BAUD_RATE = 115200
 const runtimeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
+const PORT_SORTER = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
 type SerialPortBinding = AutoDetectTypes
 type RuntimeSerialPort = SerialPortStream<SerialPortBinding>
@@ -61,7 +62,7 @@ export class OsrSerialManager {
         pnpId: port.pnpId ?? null,
         displayName: buildPortDisplayName(port.path, port.manufacturer ?? null, port.serialNumber ?? null),
       }))
-      .sort((left, right) => left.path.localeCompare(right.path))
+      .sort((left, right) => PORT_SORTER.compare(left.path, right.path))
   }
 
   async connect(path: string, baudRate = DEFAULT_BAUD_RATE): Promise<OsrSerialState> {

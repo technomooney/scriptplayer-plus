@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  集成 <b>The Handy</b> 设备、实验性 <b>Intiface / Buttplug / Direct Serial</b> 支持、<b>EroScripts</b> 浏览器登录和多语言支持的现代 Funscript 视频播放器
+  集成 <b>The Handy</b> 设备、<b>Intiface / Buttplug / FunOSR</b> 多轴支持、<b>EroScripts</b> 浏览器登录和多语言支持的现代 Funscript 视频播放器
 </p>
 
 <p align="center">
@@ -36,22 +36,15 @@
 |:-:|:-:|
 | ![设置](screenshots/setting.png) | ![macOS](screenshots/macos.png) |
 
-## Experimental v0.1.5-exp.4
+## v0.1.5 新增内容
 
-`v0.1.5-exp.4` 预发布包含面向 TCode 多轴设备的 `Direct Serial (COM)` 支持、`L0/L1/L2/R0/R1/R2` 单行 TCode 输出、更顺滑的时间线 / 热力图跟随，以及时间线 seek 后 Handy 重新同步改进。
+`v0.1.5` 正式版整合了实验阶段的多轴功能，包含官方 `FunOSR (Direct Serial / COM)` 支持、`Intiface / Buttplug` 原始 TCode 传输、可调节的 `L0/L1/L2/R0/R1/R2` 单行输出、更顺滑的时间线 / 热力图跟随、seek 后更稳定的 Handy 重新同步，以及 `exp.7` / `exp.8` 的 Windows 打包修复。
 
-| v0.1.5-exp.4 预览 |
+| v0.1.5 预览 |
 |:-:|
-| ![v0.1.5-exp.4 预览](screenshots/preview_v015_exp1.png) |
+| ![v0.1.5 预览](screenshots/preview_v015_exp1.png) |
 
-- 下载预发布版本: [ScriptPlayer+ v0.1.5-exp.4](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.4)
-
-## v0.1.4 新增内容
-
-- **连续播放 + 随机播放** — 播放结束后可以按当前文件夹顺序自动播放下一个文件，或随机选择下一个文件
-- **播放速度控制** — 可以在播放器中直接切换 `0.5x` 到 `2.0x`，同时保持 Handy 同步
-- **Handy 行程范围真正生效** — 行程最小/最大设置现在会实际变换上传脚本，而不只是改变界面显示
-- **反转行程模式** — 可以在上传前反转 funscript 位置，适配不同安装方向或反向动作需求
+- 下载正式版本: [ScriptPlayer+ v0.1.5](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5)
 
 ## 主要功能
 
@@ -68,6 +61,8 @@
   - 时间偏移调整
   - 行程范围自定义
   - 行程反转开关
+- **Intiface / Buttplug 多轴支持** — 连接兼容设备，按功能映射脚本轴，并在可用时发送原始 TCode
+- **FunOSR (COM) 支持** — 以可调刷新率向兼容设备直接发送单行 TCode
 - **EroScripts 集成** — 通过应用内浏览器登录搜索和下载 Funscript（无需 API 密钥）
   - 登录会话保存在本地
   - 可直接下载到设置的脚本保存文件夹
@@ -81,9 +76,9 @@
 
 ### Windows
 
-1. 从 [Releases](https://github.com/sioaeko/scriptplayer-plus/releases) 下载最新的 `ScriptPlayerPlus-0.1.4-Windows-x64.zip`
+1. 从 [Releases](https://github.com/sioaeko/scriptplayer-plus/releases) 下载最新的 Windows x64 构建
 2. 解压后运行 `ScriptPlayerPlus.exe` — 无需安装
-3. Direct Serial / Intiface 实验构建可从 [v0.1.5-exp.4 预发布](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.4) 下载 `ScriptPlayerPlus-0.1.5-exp.4-Windows-x64.zip`
+3. 主 `v0.1.5` 构建已包含 The Handy、Intiface / Buttplug 与官方 FunOSR 支持
 
 ### macOS
 

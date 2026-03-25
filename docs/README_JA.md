@@ -5,7 +5,7 @@
 <h1 align="center">ScriptPlayer+</h1>
 
 <p align="center">
-  <b>The Handy</b>連携、実験的な <b>Intiface / Buttplug / Direct Serial</b> 対応、<b>EroScripts</b>ブラウザログイン、多言語対応のモダンなファンスクリプトビデオプレーヤー
+  <b>The Handy</b>連携、<b>Intiface / Buttplug / FunOSR</b> のマルチアクシス対応、<b>EroScripts</b>ブラウザログイン、多言語対応のモダンなファンスクリプトビデオプレーヤー
 </p>
 
 <p align="center">
@@ -36,22 +36,15 @@
 |:-:|:-:|
 | ![設定](screenshots/setting.png) | ![macOS](screenshots/macos.png) |
 
-## 実験版 v0.1.5-exp.4
+## v0.1.5 の新機能
 
-`v0.1.5-exp.4` のプレリリースでは、TCode 対応のマルチアクシス機器向け `Direct Serial (COM)`、`L0/L1/L2/R0/R1/R2` の 1 行 TCode 出力、より滑らかなタイムライン / ヒートマップ追従、そしてタイムライン seek 後の Handy 再同期改善を含みます。
+`v0.1.5` では実験版で進めていたマルチアクシス対応を正式版へ取り込み、公式 `FunOSR (Direct Serial / COM)` サポート、`Intiface / Buttplug` の raw TCode 転送、調整可能な `L0/L1/L2/R0/R1/R2` の 1 行出力、より滑らかなタイムライン / ヒートマップ追従、seek 後の Handy 再同期改善、そして `exp.7` / `exp.8` で入った Windows パッケージ版の修正を含みます。
 
-| v0.1.5-exp.4 プレビュー |
+| v0.1.5 プレビュー |
 |:-:|
-| ![v0.1.5-exp.4 プレビュー](screenshots/preview_v015_exp1.png) |
+| ![v0.1.5 プレビュー](screenshots/preview_v015_exp1.png) |
 
-- プレリリースのダウンロード: [ScriptPlayer+ v0.1.5-exp.4](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.4)
-
-## v0.1.4 の追加内容
-
-- **連続再生 + シャッフル再生** — 再生終了後に現在のフォルダから次のファイルを自動再生するか、ランダムに次のファイルを選べます
-- **再生速度コントロール** — プレーヤー上で `0.5x` から `2.0x` まで切り替えられ、Handy の同期も維持されます
-- **Handy ストローク範囲の実動作対応** — ストローク最小/最大設定が UI 表示だけでなく、アップロードされるスクリプトに実際に適用されます
-- **ストローク反転モード** — 取り付け方向や好みに合わせて funscript の位置を反転して送信できます
+- 正式リリースのダウンロード: [ScriptPlayer+ v0.1.5](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5)
 
 ## 主な機能
 
@@ -68,6 +61,8 @@
   - 時間オフセット調整
   - ストローク範囲のカスタマイズ
   - ストローク反転トグル
+- **Intiface / Buttplug マルチアクシス対応** — 対応デバイスを接続し、機能ごとの軸マッピングと raw TCode 転送を利用できます
+- **FunOSR (COM) 対応** — 互換デバイスへ 1 行 TCode を調整可能な更新レートで直接送信します
 - **EroScripts連携** — アプリ内ブラウザログインでファンスクリプトの検索・ダウンロード（APIキー不要）
   - ログインセッションをローカル保持
   - 設定したスクリプト保存フォルダへ直接ダウンロード
@@ -81,9 +76,9 @@
 
 ### Windows
 
-1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新の `ScriptPlayerPlus-0.1.4-Windows-x64.zip` をダウンロード
+1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)から最新の Windows x64 ビルドをダウンロード
 2. 解凍して`ScriptPlayerPlus.exe`を実行 — インストール不要
-3. Direct Serial / Intiface 実験ビルドは [v0.1.5-exp.4 プレリリース](https://github.com/sioaeko/scriptplayer-plus/releases/tag/v0.1.5-exp.4) から `ScriptPlayerPlus-0.1.5-exp.4-Windows-x64.zip` をダウンロード
+3. メインの `v0.1.5` ビルドに The Handy、Intiface / Buttplug、公式 FunOSR サポートを同梱しています
 
 ### macOS
 

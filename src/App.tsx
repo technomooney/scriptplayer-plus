@@ -1211,7 +1211,7 @@ export default function App() {
     if (deviceProvider === 'serial') {
       return {
         connected: osrSerialConnected,
-        label: selectedOsrSerialPort ? selectedOsrSerialPort.path : 'Direct Serial',
+        label: selectedOsrSerialPort ? selectedOsrSerialPort.path : 'FunOSR',
         detail: `${DEFAULT_OSR_SERIAL_BAUD_RATE} baud / ${osrSerialUpdateRate}Hz`,
         statusText: osrSerialError || (!selectedOsrSerialPort && osrSerialPorts.length > 0 ? 'Select a serial port.' : null),
         statusTone: osrSerialError ? 'error' as const : null,
