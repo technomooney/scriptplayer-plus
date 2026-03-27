@@ -70,7 +70,7 @@
 - **드래그 & 드롭** — 영상 또는 오디오 파일을 플레이어에 바로 드롭
 - **폴더 브라우저** — 하위 폴더 그룹핑 및 스크립트 유무 표시 (초록 체크마크)
 - **키보드 단축키** — Space, 방향키, F (전체화면), M (음소거) 등
-- **크로스 플랫폼** — Windows (스탠드얼론) 및 macOS (GitHub Actions)
+- **크로스 플랫폼** — Windows (스탠드얼론), macOS (GitHub Actions), Linux x64 (소스 빌드)
 
 ## 설치
 
@@ -84,6 +84,10 @@
 
 1. [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)에서 최신 macOS 빌드 다운로드
 2. 압축 해제 후 `ScriptPlayerPlus.app`을 Applications 폴더로 이동
+
+### Linux
+
+Linux x64 빌드는 소스에서 만들 수 있습니다. 현재 Linux 패키지 타깃은 `AppImage`와 `linux-unpacked`입니다.
 
 ### 소스에서 빌드
 
@@ -106,6 +110,11 @@ npm run build:win
 **macOS 빌드** (macOS 필요):
 ```bash
 npm run build:mac
+```
+
+**Linux 빌드:**
+```bash
+npm run build:linux
 ```
 
 ## 키보드 단축키

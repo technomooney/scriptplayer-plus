@@ -9,6 +9,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build:linux": "vite build && electron-builder --linux",
     "build:win": "vite build && electron-builder --win && node scripts/set-icon.js",
     "build:mac": "vite build && electron-builder --mac",
     "build:all": "vite build && electron-builder --win --mac"
@@ -73,6 +74,24 @@
       ],
       "icon": "public/icon.icns",
       "category": "public.app-category.entertainment"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.png",
+      "category": "AudioVideo"
     },
     "dmg": {
       "contents": [

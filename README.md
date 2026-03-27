@@ -70,7 +70,7 @@
 - **Drag & Drop** — Drop video or audio files directly into the player
 - **Folder Browser** — Browse folders with subfolder grouping and script detection (green checkmark)
 - **Keyboard Shortcuts** — Space, Arrow keys, F (fullscreen), M (mute), and more
-- **Cross-Platform** — Windows (standalone) and macOS (via GitHub Actions)
+- **Cross-Platform** — Windows (standalone), macOS (via GitHub Actions), and Linux x64 (build from source)
 
 ## Installation
 
@@ -84,6 +84,10 @@
 
 1. Download the latest macOS build from [Releases](https://github.com/sioaeko/scriptplayer-plus/releases)
 2. Extract and move `ScriptPlayerPlus.app` to Applications
+
+### Linux
+
+Linux x64 builds can be created from source. The configured Linux package targets are `AppImage` and `linux-unpacked`.
 
 ### Build from Source
 
@@ -106,6 +110,11 @@ npm run build:win
 **Build macOS** (requires macOS):
 ```bash
 npm run build:mac
+```
+
+**Build Linux:**
+```bash
+npm run build:linux
 ```
 
 ## Keyboard Shortcuts
